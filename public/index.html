@@ -439,6 +439,8 @@ const TEAM_ALIASES = {
   'affiesmeisies':                     'ahmpmeisies',
   // Nories is the nickname for Noordheuwel
   'nories':                            'noordheuwel',
+  // Pixellot titles sometimes drop the "e" in Kimberley
+  'kimberly':                          'kimberley',
 };
 function normTeam(s) {
   let n = (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'');
@@ -454,7 +456,10 @@ function teamsMatch(a, b) {
   const strip = s => s
     .replace(/^(hoerskool|hs)/, '')
     .replace(/(school|skool)(forgirls|forboys)?$/, '')
-    .replace(/(female[a-z]*|male[a-z]*)?(firstteam|stteam|team)(girls|boys|female[a-z]*|male[a-z]*)?$/, '');
+    .replace(/(female[a-z]*|male[a-z]*)?(firstteam|stteam|team)(girls|boys|female[a-z]*|male[a-z]*)?$/, '')
+    // Trailing school-type suffix. Handles 'Kimberley Boys HS' (Pixellot) vs
+    // 'Kimberley Boys High 1st Team' (Sportivo) — both normalise to 'kimberleyboys'.
+    .replace(/(highschool|high|hs)$/, '');
   const sa = strip(a), sb = strip(b);
   if (sa === sb) return true;
   // Accept only if the shorter stripped name is fully contained in the
