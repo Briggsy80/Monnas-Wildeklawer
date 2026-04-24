@@ -16,7 +16,13 @@ const PIXELLOT_EVENT_API = 'https://supersportschools.watch.pixellot.tv/api/even
 const PIXELLOT_PROJECT = '606dace04cf99f438737e283';
 const TOURNAMENT_SUBCATEGORY = '69b0f73fc3b2da2375c41437'; // ABSA Wildeklawer Sports Festival 2026
 
-const PINNED_EVENT_IDS = [];
+// Events that drop off the Pixellot list API but remain fetchable by ID.
+// Add an event here when a known fixture's stream was previously visible
+// and has disappeared from /api/streams. Cheap to leave: each pinned ID
+// costs one extra GET on the streams refresh (5-min cache at the edge).
+const PINNED_EVENT_IDS = [
+  '69e735df467cdd26ec56a830', // HS Monument vs Northern Cape HS — Girls, Sat 25 Apr 08:30
+];
 
 const ULTIMATERUGBY_URL = 'https://www.ultimaterugby.com/wildeklawer-rugby/matches';
 const WK_RUGBY_VENUES = ['diamantveld', 'kbh', 'laerskool staats', 'alternatiewe', 'spu'];
