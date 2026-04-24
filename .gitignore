@@ -1,0 +1,4 @@
+.wrangler/
+.claude/
+node_modules/
+*.Zone.Identifier

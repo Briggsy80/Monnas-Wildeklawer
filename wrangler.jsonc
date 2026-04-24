@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "monnas-wildeklawer",
+  "compatibility_date": "2025-09-27",
+  "main": "worker.js",
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS"
+  }
+}

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monument — ABSA Wildeklawer Hockey 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#07111f; --surface:#0f1e30; --surface2:#162840; --border:#1e3a55;
+  --gold:#e8b84b; --gold-dim:#8a6a1f;
+  --green:#22c55e; --red:#ef4444; --amber:#f59e0b; --blue:#3b82f6;
+  --muted:#4a6480; --text:#e8edf2; --text-dim:#7a9ab8;
+  --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;padding-bottom:40px;}
+
+header{background:linear-gradient(160deg,#0b1e35,#071428);border-bottom:2px solid var(--gold);
+  padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:110;}
+.header-text{flex:1;}
+.header-text h1{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:19px;color:var(--gold);
+  line-height:1;letter-spacing:.5px;text-transform:uppercase;}
+.header-text p{font-size:11px;color:var(--text-dim);letter-spacing:.5px;margin-top:2px;}
+.sync-pill{display:flex;align-items:center;gap:5px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:20px;padding:4px 10px;flex-shrink:0;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s;}
+.sync-dot.ok{background:var(--green);}
+.sync-dot.err{background:var(--red);}
+.sync-dot.pulse{animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.sync-label{font-size:10px;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;
+  font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
+
+.section{padding:12px 14px;}
+.section-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:16px;color:var(--gold);
+  text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+
+.meta-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;}
+.meta-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;}
+.meta-row span:first-child{color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;font-family:'Barlow Condensed',sans-serif;font-weight:700;}
+.meta-row span:last-child{color:var(--text);}
+
+/* tabs */
+.tab-nav{display:flex;gap:2px;padding:10px 14px 0;overflow-x:auto;position:sticky;top:78px;z-index:100;background:var(--bg);}
+.tab-btn{flex:1;padding:9px 6px;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0;
+  cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
+  color:var(--muted);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;}
+.tab-btn.active{background:var(--surface2);border-bottom-color:var(--surface2);color:var(--gold);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+/* groups */
+.group-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:12px;}
+.group-header{background:var(--surface2);padding:9px 14px;font-family:'Barlow Condensed',sans-serif;
+  font-weight:800;font-size:14px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);}
+table.log{width:100%;border-collapse:collapse;font-size:12px;}
+table.log th,table.log td{padding:7px 6px;text-align:center;border-bottom:1px solid var(--border);}
+table.log th{background:#0a1a2c;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:.5px;}
+table.log td.team{text-align:left;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+table.log td.team img{height:18px;width:18px;vertical-align:middle;margin-right:6px;border-radius:3px;background:#fff;}
+table.log tr.monument td{color:var(--gold);background:#0d1e32;}
+
+/* fixtures */
+.day-group{margin-bottom:14px;}
+.day-header{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;
+  color:var(--gold);text-transform:uppercase;letter-spacing:1px;
+  padding:8px 12px;background:var(--surface2);border-radius:8px 8px 0 0;border-bottom:2px solid var(--gold-dim);}
+.fix-row{display:flex;align-items:center;gap:8px;padding:10px 12px;
+  background:var(--surface);border-left:2px solid var(--border);border-bottom:1px solid var(--border);font-size:12px;}
+.fix-row:last-child{border-radius:0 0 8px 8px;}
+.fix-row.monument-match{border-left-color:var(--gold);background:#0d1e32;}
+.fix-time{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--gold-dim);min-width:44px;}
+.fix-teams{flex:1;display:flex;align-items:center;gap:6px;}
+.fix-teams img{height:16px;width:16px;border-radius:2px;background:#fff;}
+.fix-vs{color:var(--muted);font-size:11px;padding:0 4px;}
+.fix-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:13px;color:var(--text);min-width:34px;text-align:right;}
+.fix-venue{font-size:10px;color:var(--text-dim);white-space:nowrap;}
+
+/* streams */
+.stream-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;margin-bottom:6px;}
+.stream-status{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:10px;padding:3px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;}
+.stream-status.live{background:var(--red);color:#fff;animation:pulse 1.5s infinite;}
+.stream-status.upcoming{background:var(--blue);color:#fff;}
+.stream-status.archived{background:var(--muted);color:#fff;}
+.stream-title{flex:1;font-size:12px;}
+.stream-link{color:var(--gold);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;text-decoration:none;padding:5px 10px;border:1px solid var(--gold-dim);border-radius:5px;}
+.stream-link:hover{background:var(--gold);color:#000;}
+
+.loading,.empty{padding:40px 14px;text-align:center;color:var(--text-dim);font-size:13px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-text">
+    <h1>Monument — ABSA Wildeklawer Hockey 2026</h1>
+    <p>U19 Girls · Kimberley · 24 April – 3 May</p>
+  </div>
+  <div class="sync-pill"><span class="sync-dot" id="syncDot"></span><span class="sync-label" id="syncLabel">Loading</span></div>
+</header>
+
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="overview">Overview</button>
+  <button class="tab-btn" data-tab="groups">Groups</button>
+  <button class="tab-btn" data-tab="fixtures">Fixtures</button>
+  <button class="tab-btn" data-tab="streams">Streams</button>
+</nav>
+
+<section class="tab-pane active" id="tab-overview">
+  <div class="section">
+    <div class="section-title">Tournament</div>
+    <div class="meta-card" id="meta"><div class="loading">Loading…</div></div>
+  </div>
+  <div class="section">
+    <div class="section-title">Monument Fixtures</div>
+    <div id="monumentFixtures"><div class="loading">Loading…</div></div>
+  </div>
+</section>
+
+<section class="tab-pane" id="tab-groups">
+  <div class="section"><div id="groups"><div class="loading">Loading…</div></div></div>
+</section>
+
+<section class="tab-pane" id="tab-fixtures">
+  <div class="section"><div id="fixtures"><div class="loading">Loading…</div></div></div>
+</section>
+
+<section class="tab-pane" id="tab-streams">
+  <div class="section"><div id="streams"><div class="loading">Loading…</div></div></div>
+</section>
+
+<script>
+const MONUMENT_MARKER = 'Monument';
+
+function setSync(state, label) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  dot.className = 'sync-dot ' + state;
+  lbl.textContent = label;
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long' });
+}
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-ZA', { hour:'2-digit', minute:'2-digit', hour12:false });
+}
+function isMonument(name) {
+  return (name || '').includes(MONUMENT_MARKER);
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderMeta(d) {
+  const el = document.getElementById('meta');
+  el.innerHTML = `
+    <div class="meta-row"><span>Tournament</span><span>${esc(d.description)}</span></div>
+    <div class="meta-row"><span>Sport</span><span>${esc(d.sportDescription)} · ${esc(d.genderDescription)} · ${esc(d.ageGroupDescription)}</span></div>
+    <div class="meta-row"><span>Host</span><span>${esc(d.organisationName)}</span></div>
+    <div class="meta-row"><span>Dates</span><span>${esc(d.startDate)} → ${esc(d.endDate)}</span></div>
+    <div class="meta-row"><span>Groups</span><span>${d.numberOfGroups} pools, ${d.teams?.length || 0} teams</span></div>
+    <div class="meta-row"><span>Rules</span><span>${d.periodsPerMatch} × ${d.minutesPerPeriod} min</span></div>`;
+}
+
+function renderGroups(d) {
+  const el = document.getElementById('groups');
+  if (!d.groups?.length) { el.innerHTML = '<div class="empty">No groups yet.</div>'; return; }
+  el.innerHTML = d.groups.map(g => `
+    <div class="group-card">
+      <div class="group-header">${esc(g.name)}</div>
+      <table class="log">
+        <thead><tr><th style="text-align:left;padding-left:14px;">Team</th>${g.logHeaders.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${(g.groupLog||[]).map(r=>`
+            <tr class="${isMonument(r.teamName)?'monument':''}">
+              <td class="team" style="padding-left:14px;">
+                ${r.organisationLogo ? `<img src="${esc(r.organisationLogo)}" alt="">` : ''}${esc(r.teamName)}
+              </td>
+              <td>${r.matchesPlayed}</td><td>${r.matchesWon}</td><td>${r.matchesDraw}</td><td>${r.matchesLost}</td>
+              <td>${r.goalsFor}</td><td>${r.goalsAgainst}</td><td>${r.goalDifference}</td><td><b>${r.points}</b></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
+}
+
+function groupMatchesByDay(matches) {
+  const by = {};
+  for (const m of matches) {
+    const key = (m.matchDateTime || '').slice(0,10);
+    (by[key] = by[key] || []).push(m);
+  }
+  return by;
+}
+
+function matchRow(m) {
+  const mon = isMonument(m.team1Name) || isMonument(m.team2Name);
+  const s1 = m.team1GoalsFor ?? m.team1ResultType;
+  const s2 = m.team2GoalsFor ?? m.team2ResultType;
+  const hasScore = s1 != null && s2 != null && (typeof s1 === 'number' || typeof s2 === 'number');
+  return `
+    <div class="fix-row ${mon?'monument-match':''}">
+      <div class="fix-time">${esc(fmtTime(m.matchDateTime))}</div>
+      <div class="fix-teams">
+        ${m.team1Logo?`<img src="${esc(m.team1Logo)}" alt="">`:''}<span>${esc(m.team1Name)}</span>
+        <span class="fix-vs">v</span>
+        <span>${esc(m.team2Name)}</span>${m.team2Logo?`<img src="${esc(m.team2Logo)}" alt="">`:''}
+      </div>
+      <div class="fix-score">${hasScore?`${s1 ?? '-'} – ${s2 ?? '-'}`:''}</div>
+      <div class="fix-venue">${esc(m.locationDisplay || '')}</div>
+    </div>`;
+}
+
+function renderFixtures(d) {
+  const el = document.getElementById('fixtures');
+  const matches = (d.phases?.[0]?.matches) || [];
+  if (!matches.length) { el.innerHTML = '<div class="empty">No fixtures yet.</div>'; return; }
+  const by = groupMatchesByDay(matches);
+  const days = Object.keys(by).sort();
+  el.innerHTML = days.map(day => `
+    <div class="day-group">
+      <div class="day-header">${esc(fmtDate(day))}</div>
+      ${by[day].sort((a,b)=>a.matchDateTime.localeCompare(b.matchDateTime)).map(matchRow).join('')}
+    </div>`).join('');
+
+  const monEl = document.getElementById('monumentFixtures');
+  const mon = matches.filter(m => isMonument(m.team1Name) || isMonument(m.team2Name))
+    .sort((a,b)=>a.matchDateTime.localeCompare(b.matchDateTime));
+  if (!mon.length) { monEl.innerHTML = '<div class="empty">No Monument fixtures found.</div>'; return; }
+  monEl.innerHTML = mon.map(m => `
+    <div class="fix-row monument-match">
+      <div class="fix-time">${esc(fmtTime(m.matchDateTime))}</div>
+      <div class="fix-teams"><span>${esc(m.team1Name)}</span><span class="fix-vs">v</span><span>${esc(m.team2Name)}</span></div>
+      <div class="fix-venue">${esc(fmtDate(m.matchDateTime).split(',')[0])} · ${esc(m.locationDisplay||'')}</div>
+    </div>`).join('');
+}
+
+async function loadTournament() {
+  setSync('pulse', 'Syncing');
+  try {
+    const r = await fetch('/api/tournament');
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const d = j.data;
+    renderMeta(d);
+    renderGroups(d);
+    renderFixtures(d);
+    setSync('ok', 'Live');
+  } catch (e) {
+    setSync('err', 'Offline');
+    document.getElementById('meta').innerHTML = '<div class="empty">Failed to load tournament.</div>';
+  }
+}
+
+async function loadStreams() {
+  const el = document.getElementById('streams');
+  try {
+    const r = await fetch('/api/streams');
+    if (!r.ok) throw new Error(r.status);
+    const { events } = await r.json();
+    if (!events?.length) { el.innerHTML = '<div class="empty">No hockey streams yet. Check back when matches are underway.</div>'; return; }
+    const order = { live:0, upcoming:1, archived:2 };
+    events.sort((a,b)=>(order[a.status]??9)-(order[b.status]??9) || (a.date-b.date));
+    el.innerHTML = events.map(e => `
+      <div class="stream-row">
+        <span class="stream-status ${esc(e.status)}">${esc(e.status)}</span>
+        <div class="stream-title">${esc(e.title || (e.home + ' vs ' + e.away))}</div>
+        <a class="stream-link" href="${esc(e.url)}" target="_blank" rel="noopener">Watch</a>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="empty">Failed to load streams.</div>';
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('tab-' + b.dataset.tab).classList.add('active');
+  });
+});
+
+loadTournament();
+loadStreams();
+setInterval(loadTournament, 60_000);
+setInterval(loadStreams, 120_000);
+</script>
+
+</body>
+</html>
