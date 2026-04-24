@@ -441,6 +441,15 @@ const TEAM_ALIASES = {
   'nories':                            'noordheuwel',
   // Pixellot titles sometimes drop the "e" in Kimberley
   'kimberly':                          'kimberley',
+  // RHS abbreviation for Rustenburg Hoërskool (used in "RHS 1ste Seuns")
+  'rhs':                               'rustenburg',
+  // Uppies is the nickname for Upington
+  'uppies':                            'upington',
+  // Sportivo uses short 'Paarl Gim'; Pixellot uses full 'Paarl Gimnasium'.
+  // Collapse the long form to the short — containment then matches both.
+  'paarlgimnasium':                    'paarlgim',
+  // Same for Potch (Sportivo) vs Potchefstroom Gimnasium (Pixellot)
+  'potchefstroom':                     'potch',
 };
 function normTeam(s) {
   let n = (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'');
@@ -459,7 +468,12 @@ function teamsMatch(a, b) {
     .replace(/(female[a-z]*|male[a-z]*)?(firstteam|stteam|team)(girls|boys|female[a-z]*|male[a-z]*)?$/, '')
     // Trailing school-type suffix. Handles 'Kimberley Boys HS' (Pixellot) vs
     // 'Kimberley Boys High 1st Team' (Sportivo) — both normalise to 'kimberleyboys'.
-    .replace(/(highschool|high|hs)$/, '');
+    .replace(/(highschool|high|hs)$/, '')
+    // Afrikaans gender suffix, with optional preceding 'ste' ordinal (from
+    // '1ste'). Handles 'RHS 1ste Seuns' → rustenburg, 'Nories Boys' → noordheuwel,
+    // 'Uppies Boys 1st Team' → upington (after the team suffix has been stripped).
+    // Excludes 'meisies' — AHMP's canonical form intentionally keeps it.
+    .replace(/(ste)?(seuns|dogters|boys|girls)$/, '');
   const sa = strip(a), sb = strip(b);
   if (sa === sb) return true;
   // Accept only if the shorter stripped name is fully contained in the
