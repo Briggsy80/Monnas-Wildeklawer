@@ -530,7 +530,7 @@ function renderPools(d) {
 /* ============================================================
  * Render: fixtures
  * ============================================================ */
-function matchRow(m) {
+function matchRow(m, isScrollAnchor) {
   const f1 = isFollowed(m.team1Id), f2 = isFollowed(m.team2Id);
   const isFollowedMatch = f1 || f2;
   const s1 = m.team1GoalsFor, s2 = m.team2GoalsFor;
@@ -551,7 +551,7 @@ function matchRow(m) {
     provBadge = `<span class="fix-badge age">${esc(m.age.toUpperCase())}</span>`;
   }
   return `
-    <div class="fix-row ${isFollowedMatch?'followed-match':''} ${hasScore?'has-score':''} ${isProv?'provisional':''}">
+    <div class="fix-row ${isFollowedMatch?'followed-match':''} ${hasScore?'has-score':''} ${isProv?'provisional':''}"${isScrollAnchor?' id="scroll-target"':''}>
       <div class="fix-time">${esc(fmtTime(m.matchDateTime))}</div>
       <div class="fix-main">
         <div class="fix-teams-line">
@@ -627,13 +627,28 @@ function renderFixtures(d) {
     const key = (m.matchDateTime || '').slice(0,10);
     (by[key] = by[key] || []).push(m);
   }
-  el.innerHTML = Object.keys(by).sort().map(day => {
-    const dayMatches = by[day].sort((a,b)=>a.matchDateTime.localeCompare(b.matchDateTime));
+  // Sort each day's matches by time, then compute the global index of the
+  // last scored fixture so we can anchor the auto-scroll 4 rows past it
+  // (i.e. centred on the ~next 4 upcoming fixtures).
+  const sortedDays = Object.keys(by).sort();
+  let globalIdx = 0, lastScoredIdx = -1;
+  for (const day of sortedDays) {
+    by[day].sort((a,b) => a.matchDateTime.localeCompare(b.matchDateTime));
+    for (const m of by[day]) {
+      if (typeof m.team1GoalsFor === 'number' && typeof m.team2GoalsFor === 'number') lastScoredIdx = globalIdx;
+      globalIdx++;
+    }
+  }
+  const anchorIdx = lastScoredIdx + 4;
+  let idx = 0;
+  el.innerHTML = sortedDays.map(day => {
+    const dayMatches = by[day];
     const isOpen = day >= today; // today and future stay expanded; past days collapse
     const played = dayMatches.filter(m => typeof m.team1GoalsFor === 'number' && typeof m.team2GoalsFor === 'number').length;
     const meta = isOpen
       ? `${dayMatches.length} match${dayMatches.length===1?'':'es'}`
       : `${dayMatches.length} played`;
+    const rows = dayMatches.map(m => matchRow(m, idx++ === anchorIdx)).join('');
     return `
     <details class="day-group"${isOpen?' open':''}>
       <summary class="day-header">
@@ -641,9 +656,28 @@ function renderFixtures(d) {
         <span class="day-label">${esc(fmtDate(day))}</span>
         <span class="day-meta">${meta}</span>
       </summary>
-      ${dayMatches.map(matchRow).join('')}
+      ${rows}
     </details>`;
   }).join('');
+
+  // Auto-scroll: bring the next ~4 upcoming fixtures into view, debounced
+  // 20 minutes so we don't yank the viewport on every 60-second poll.
+  // Only runs when the Fixtures tab is visible (scrollIntoView on hidden
+  // panes gives unpredictable results) and when a real anchor exists.
+  const SCROLL_COOLDOWN_MS = 20 * 60 * 1000;
+  const fixturesPane = document.getElementById('tab-fixtures');
+  if (fixturesPane && fixturesPane.classList.contains('active')) {
+    const now = Date.now();
+    if (!renderFixtures._lastScroll || now - renderFixtures._lastScroll > SCROLL_COOLDOWN_MS) {
+      const anchor = document.getElementById('scroll-target');
+      if (anchor) {
+        const details = anchor.closest('details');
+        if (details && !details.open) details.open = true; // reveal if parent day collapsed
+        setTimeout(() => anchor.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+        renderFixtures._lastScroll = now;
+      }
+    }
+  }
 }
 
 /* ============================================================
