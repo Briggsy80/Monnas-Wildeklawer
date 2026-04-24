@@ -426,21 +426,43 @@ function loadFollowed() {
 /* ============================================================
  * Stream matching (by team name + date + sport/gender/age)
  * ============================================================ */
+
+/* Aliases collapse the different short-codes / nicknames / full names
+ * used across Sportivo vs Pixellot for the same school. Applied to the
+ * normalised (lowercase-alpha) string, so only lowercase letters.
+ * Canonical form is whatever produces the cleanest shared prefix once
+ * the generic team/gender/age suffixes are stripped by strip() below. */
+const TEAM_ALIASES = {
+  // AHMP = Afrikaanse Hoër Meisieskool Pretoria ≡ "Affies Meisies" (Sportivo)
+  'afrikaansehoermeisieskoolpretoria': 'ahmpmeisies',
+  'afrikaansehoermeisieskool':         'ahmpmeisies',
+  'affiesmeisies':                     'ahmpmeisies',
+  // Nories is the nickname for Noordheuwel
+  'nories':                            'noordheuwel',
+};
 function normTeam(s) {
-  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'');
+  let n = (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'');
+  for (const [from, to] of Object.entries(TEAM_ALIASES)) n = n.replace(from, to);
+  return n;
 }
 function teamsMatch(a, b) {
   if (a === b) return true;
-  const strip = s => s.replace(/^(hoerskool|hs)/, '').replace(/(school|skool)(forgirls|forboys)?$/, '').replace(/(firstteam|stteam|team)(girls|boys|femaleu\d+|maleu\d+)?$/,'');
+  // Strip leading HS/Hoërskool, trailing School/Skool, and trailing
+  // "(Gender)? (Team)? (Gender)?" combinations. Handles both orderings:
+  //   hockey order:  HS Monument 1st Team Boys → monument
+  //   netball order: Affies Meisies Female U19 1st Team → affiesmeisies
+  const strip = s => s
+    .replace(/^(hoerskool|hs)/, '')
+    .replace(/(school|skool)(forgirls|forboys)?$/, '')
+    .replace(/(female[a-z]*|male[a-z]*)?(firstteam|stteam|team)(girls|boys|female[a-z]*|male[a-z]*)?$/, '');
   const sa = strip(a), sb = strip(b);
   if (sa === sb) return true;
+  // Accept only if the shorter stripped name is fully contained in the
+  // longer one, and at least 5 chars long. No sliding-window fuzzy match —
+  // that incorrectly paired teams sharing common Afrikaans tokens (e.g.
+  // "Affies Meisies" ≠ "Meisieskool Oranje" despite both containing "meisie").
   const [shorter, longer] = sa.length <= sb.length ? [sa, sb] : [sb, sa];
   if (shorter.length >= 5 && longer.includes(shorter)) return true;
-  if (shorter.length >= 6) {
-    for (let i = 0; i <= shorter.length - 6; i++) {
-      if (longer.includes(shorter.slice(i, i+6))) return true;
-    }
-  }
   return false;
 }
 function currentFilters() {
