@@ -80,9 +80,18 @@ header{background:linear-gradient(160deg,#0b1e35,#071428);border-bottom:2px soli
 
 /* fixtures */
 .day-group{margin-bottom:14px;}
+.day-group[open] .day-header{border-radius:8px 8px 0 0;}
+.day-group:not([open]) .day-header{border-radius:8px;border-bottom-color:var(--border);}
 .day-header{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;
-  color:var(--gold);text-transform:uppercase;letter-spacing:1px;
-  padding:8px 12px;background:var(--surface2);border-radius:8px 8px 0 0;border-bottom:2px solid var(--gold-dim);}
+  color:var(--gold);text-transform:uppercase;letter-spacing:1px;cursor:pointer;list-style:none;
+  padding:8px 12px;background:var(--surface2);border-bottom:2px solid var(--gold-dim);
+  display:flex;align-items:center;gap:8px;user-select:none;}
+.day-header::-webkit-details-marker{display:none;}
+.day-chevron{display:inline-block;font-size:14px;color:var(--gold-dim);transition:transform .2s;line-height:1;}
+.day-group[open] .day-chevron{transform:rotate(90deg);}
+.day-label{flex:1;}
+.day-meta{font-size:10px;color:var(--text-dim);font-weight:600;letter-spacing:.5px;}
+.day-group:not([open]) .day-header{border-bottom:1px solid var(--border);}
 .fix-row{display:flex;align-items:center;gap:8px;padding:10px 12px;
   background:var(--surface);border-left:2px solid var(--border);border-bottom:1px solid var(--border);font-size:12px;}
 .fix-row:last-child{border-radius:0 0 8px 8px;}
@@ -100,6 +109,13 @@ header{background:linear-gradient(160deg,#0b1e35,#071428);border-bottom:2px soli
 .fix-venue{color:var(--muted);}
 .fix-score{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:17px;color:var(--green);min-width:48px;text-align:right;}
 .fix-score.no-score{color:var(--text-dim);font-size:12px;font-weight:600;}
+.fix-badge{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:9px;
+  padding:2px 6px;border-radius:3px;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0;}
+.fix-badge.age{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);}
+.fix-badge.provisional{background:#2a1f0a;color:var(--amber);border:1px solid var(--gold-dim);}
+.fix-badge.external{background:var(--surface2);color:var(--blue);border:1px solid var(--blue);}
+.fix-badge.external a{color:inherit;text-decoration:none;}
+.fix-row.provisional{border-left-style:dashed;opacity:.93;}
 
 /* stream button */
 .stream-btn{display:inline-flex;align-items:center;gap:4px;font-family:'Barlow Condensed',sans-serif;font-weight:800;
@@ -241,12 +257,80 @@ const SPORTS = {
 /* ============================================================
  * State
  * ============================================================ */
-let currentSport   = localStorage.getItem('wk-sport') || 'hockey';
+let currentSport    = localStorage.getItem('wk-sport') || 'hockey';
 if (!SPORTS[currentSport]) currentSport = 'hockey';
-let currentKey     = localStorage.getItem('wk-variant:' + currentSport) || SPORTS[currentSport].variants[0].key;
-let tournamentData = null;
-let streams        = [];
-let followed       = new Set();
+let currentKey      = localStorage.getItem('wk-variant:' + currentSport) || SPORTS[currentSport].variants[0].key;
+let tournamentData  = null;
+let streams         = [];
+let followed        = new Set();
+let externalMatches = [];  // ultimaterugby scraped fixtures (rugby only)
+
+/* ============================================================
+ * Hockey Day 2/3 fallback fixtures (transcribed from the
+ * organisers' published schedule). Used only when Sportivo has
+ * no matches on those dates — Sportivo overrides automatically.
+ * Team names are positional placeholders until pools complete.
+ * ============================================================ */
+const HOCKEY_FALLBACK = {
+  'hockey-girls': { venue: 'KHS/DHS', matches: [
+    // Day 2 — Sun 26 Apr 2026 — playoff semis
+    { n:24, d:'2026-04-26', t:'07:30', label:'Bottom 4 Playoff', t1:'4th Group 1',  t2:'4th Group 2' },
+    { n:25, d:'2026-04-26', t:'08:50', label:'Bottom 4 Playoff', t1:'4th Group 3',  t2:'4th Group 4' },
+    { n:26, d:'2026-04-26', t:'10:10', label:'Shield Semi Final', t1:'3rd Group 1', t2:'3rd Group 2' },
+    { n:27, d:'2026-04-26', t:'10:30', label:'Shield Semi Final', t1:'3rd Group 3', t2:'3rd Group 4' },
+    { n:28, d:'2026-04-26', t:'11:50', label:'Plate Semi Final',  t1:'2nd Group 1', t2:'2nd Group 2' },
+    { n:29, d:'2026-04-26', t:'13:10', label:'Plate Semi Final',  t1:'2nd Group 3', t2:'2nd Group 4' },
+    { n:30, d:'2026-04-26', t:'14:30', label:'Cup Semi Final',    t1:'1st Group 1', t2:'1st Group 2' },
+    { n:31, d:'2026-04-26', t:'15:50', label:'Cup Semi Final',    t1:'1st Group 3', t2:'1st Group 4' },
+    // Day 3 — Mon 27 Apr 2026 — classification finals
+    { n:32, d:'2026-04-27', t:'07:30', label:'Position 15 & 16',  t1:'Loser M24',   t2:'Loser M25' },
+    { n:33, d:'2026-04-27', t:'08:50', label:'Position 13 & 14',  t1:'Winner M24',  t2:'Winner M25' },
+    { n:34, d:'2026-04-27', t:'10:10', label:'Position 11 & 12',  t1:'Loser M26',   t2:'Loser M27' },
+    { n:35, d:'2026-04-27', t:'10:30', label:'Position 9 & 10',   t1:'Winner M26',  t2:'Winner M27' },
+    { n:36, d:'2026-04-27', t:'11:50', label:'Position 7 & 8',    t1:'Loser M28',   t2:'Loser M29' },
+    { n:37, d:'2026-04-27', t:'13:10', label:'Position 5 & 6',    t1:'Winner M28',  t2:'Winner M29' },
+    { n:38, d:'2026-04-27', t:'14:30', label:'Position 3 & 4',    t1:'Loser M30',   t2:'Loser M31' },
+    { n:39, d:'2026-04-27', t:'15:50', label:'Final — Position 1 & 2', t1:'Winner M30', t2:'Winner M31' },
+  ]},
+  'hockey-boys': { venue: 'SPU', matches: [
+    { n:24, d:'2026-04-26', t:'07:30', label:'Bottom 4 Playoff', t1:'4th Group 1',  t2:'4th Group 2' },
+    { n:25, d:'2026-04-26', t:'08:50', label:'Bottom 4 Playoff', t1:'4th Group 3',  t2:'4th Group 4' },
+    { n:26, d:'2026-04-26', t:'10:10', label:'Shield Semi Final', t1:'3rd Group 1', t2:'3rd Group 2' },
+    { n:27, d:'2026-04-26', t:'10:30', label:'Shield Semi Final', t1:'3rd Group 3', t2:'3rd Group 4' },
+    { n:28, d:'2026-04-26', t:'11:50', label:'Plate Semi Final',  t1:'2nd Group 1', t2:'2nd Group 2' },
+    { n:29, d:'2026-04-26', t:'13:10', label:'Plate Semi Final',  t1:'2nd Group 3', t2:'2nd Group 4' },
+    { n:30, d:'2026-04-26', t:'14:30', label:'Cup Semi Final',    t1:'1st Group 1', t2:'1st Group 2' },
+    { n:31, d:'2026-04-26', t:'15:50', label:'Cup Semi Final',    t1:'1st Group 3', t2:'1st Group 4' },
+    { n:32, d:'2026-04-27', t:'07:30', label:'Position 15 & 16',  t1:'Loser M24',   t2:'Loser M25' },
+    { n:33, d:'2026-04-27', t:'08:50', label:'Position 13 & 14',  t1:'Winner M24',  t2:'Winner M25' },
+    { n:34, d:'2026-04-27', t:'10:10', label:'Position 11 & 12',  t1:'Loser M26',   t2:'Loser M27' },
+    { n:35, d:'2026-04-27', t:'10:30', label:'Position 9 & 10',   t1:'Winner M26',  t2:'Winner M27' },
+    { n:36, d:'2026-04-27', t:'11:50', label:'Position 7 & 8',    t1:'Loser M28',   t2:'Loser M29' },
+    { n:37, d:'2026-04-27', t:'13:10', label:'Position 5 & 6',    t1:'Winner M28',  t2:'Winner M29' },
+    { n:38, d:'2026-04-27', t:'14:30', label:'Position 3 & 4',    t1:'Loser M30',   t2:'Loser M31' },
+    { n:39, d:'2026-04-27', t:'15:50', label:'Final — Position 1 & 2', t1:'Winner M30', t2:'Winner M31' },
+  ]},
+};
+function hockeyFallbackToMatches(key) {
+  const entry = HOCKEY_FALLBACK[key];
+  if (!entry) return [];
+  return entry.matches.map(m => ({
+    id: `fallback-${key}-${m.n}`,
+    matchDateTime: `${m.d}T${m.t}:00+02:00`,
+    team1Name: m.t1, team2Name: m.t2,
+    team1Id: null, team2Id: null,
+    team1GoalsFor: null, team2GoalsFor: null,
+    locationDisplay: entry.venue,
+    phaseLabel: m.label,
+    matchNumber: m.n,
+    source: 'fallback',
+  }));
+}
+/* Today's date in SAST (YYYY-MM-DD). Re-evaluated on every render so
+ * day groups roll from open to collapsed naturally at local midnight. */
+function todayISO() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Johannesburg' });
+}
 
 /* ============================================================
  * Helpers
@@ -393,8 +477,19 @@ function matchRow(m) {
   const s1 = m.team1GoalsFor, s2 = m.team2GoalsFor;
   const hasScore = typeof s1 === 'number' && typeof s2 === 'number';
   const stream = findStream(m.team1Name, m.team2Name, m.matchDateTime);
+  const isProv = m.source === 'fallback' || m.source === 'ultimaterugby';
+  let provBadge = '';
+  if (m.source === 'fallback') {
+    provBadge = `<span class="fix-badge provisional" title="Scheduled fixture — will be replaced by live data when Sportivo publishes it">${esc(m.phaseLabel || 'Provisional')}</span>`;
+  } else if (m.source === 'ultimaterugby') {
+    const ageLabel = m.age ? m.age.toUpperCase() : '';
+    const parts = [ageLabel, m.locationDisplay].filter(Boolean).join(' · ');
+    provBadge = `<span class="fix-badge external" title="via ultimaterugby.com"><a href="${esc(m.externalUrl||'#')}" target="_blank" rel="noopener">${esc(parts || 'ultimaterugby')}</a></span>`;
+  } else if (m.age) {
+    provBadge = `<span class="fix-badge age">${esc(m.age.toUpperCase())}</span>`;
+  }
   return `
-    <div class="fix-row ${isFollowedMatch?'followed-match':''} ${hasScore?'has-score':''}">
+    <div class="fix-row ${isFollowedMatch?'followed-match':''} ${hasScore?'has-score':''} ${isProv?'provisional':''}">
       <div class="fix-time">${esc(fmtTime(m.matchDateTime))}</div>
       <div class="fix-main">
         <div class="fix-teams-line">
@@ -405,7 +500,8 @@ function matchRow(m) {
           ${m.team2Logo?`<img src="${esc(m.team2Logo)}" alt="">`:''}
         </div>
         <div class="fix-sub">
-          ${m.locationDisplay?`<span class="fix-venue">📍 ${esc(m.locationDisplay)}</span>`:''}
+          ${m.locationDisplay && m.source !== 'ultimaterugby'?`<span class="fix-venue">📍 ${esc(m.locationDisplay)}</span>`:''}
+          ${provBadge}
           ${streamBtn(stream)}
         </div>
       </div>
@@ -413,23 +509,78 @@ function matchRow(m) {
     </div>`;
 }
 
+/* Combine Sportivo matches with hockey fallback and/or external rugby
+ * data. Sportivo always wins: a fallback/external match is dropped if
+ * Sportivo has a match on the same date with matching team names.
+ * Hockey positional fallbacks (e.g. "4th Group 1 vs 4th Group 2") will
+ * never team-match Sportivo, so the whole-date override is used for
+ * those (if Sportivo has any matches on day 2/3, drop fallback). */
+function mergeFixtures(sportivo) {
+  const merged = [...sportivo];
+  const sportivoDates = new Set(sportivo.map(m => (m.matchDateTime || '').slice(0,10)));
+
+  // Hockey fallback (only for hockey-girls / hockey-boys keys)
+  if (HOCKEY_FALLBACK[currentKey]) {
+    for (const fb of hockeyFallbackToMatches(currentKey)) {
+      const day = fb.matchDateTime.slice(0,10);
+      if (sportivoDates.has(day)) continue; // Sportivo has taken over this day
+      merged.push(fb);
+    }
+  }
+
+  // External rugby matches (only when viewing a rugby tournament)
+  if (currentSport === 'rugby' && externalMatches.length) {
+    const currentAge = (tournamentData?.ageGroupDescription || '').toLowerCase();
+    for (const ext of externalMatches) {
+      // Filter by age: skip if external match has an age that doesn't match selected
+      if (ext.age && currentAge && ext.age !== currentAge) continue;
+      // Per-match dedupe: skip if Sportivo has an equivalent fixture on that date
+      const day = (ext.matchDateTime || '').slice(0,10);
+      const n1 = normTeam(ext.team1Name), n2 = normTeam(ext.team2Name);
+      const overlap = sportivo.some(s => {
+        if ((s.matchDateTime || '').slice(0,10) !== day) return false;
+        const sn1 = normTeam(s.team1Name), sn2 = normTeam(s.team2Name);
+        return (teamsMatch(n1, sn1) && teamsMatch(n2, sn2)) ||
+               (teamsMatch(n1, sn2) && teamsMatch(n2, sn1));
+      });
+      if (overlap) continue;
+      merged.push(ext);
+    }
+  }
+  return merged;
+}
+
 function renderFixtures(d) {
   const el = document.getElementById('fixtures');
-  const matches = (d.phases?.[0]?.matches) || [];
+  const sportivo = (d.phases?.[0]?.matches) || [];
+  const matches = mergeFixtures(sportivo);
   if (!matches.length) {
     el.innerHTML = '<div class="empty">Fixtures not yet published for this tournament.<br>They will appear here automatically once the organisers release them.</div>';
     return;
   }
+  const today = todayISO();
   const by = {};
   for (const m of matches) {
     const key = (m.matchDateTime || '').slice(0,10);
     (by[key] = by[key] || []).push(m);
   }
-  el.innerHTML = Object.keys(by).sort().map(day => `
-    <div class="day-group">
-      <div class="day-header">${esc(fmtDate(day))}</div>
-      ${by[day].sort((a,b)=>a.matchDateTime.localeCompare(b.matchDateTime)).map(matchRow).join('')}
-    </div>`).join('');
+  el.innerHTML = Object.keys(by).sort().map(day => {
+    const dayMatches = by[day].sort((a,b)=>a.matchDateTime.localeCompare(b.matchDateTime));
+    const isOpen = day >= today; // today and future stay expanded; past days collapse
+    const played = dayMatches.filter(m => typeof m.team1GoalsFor === 'number' && typeof m.team2GoalsFor === 'number').length;
+    const meta = isOpen
+      ? `${dayMatches.length} match${dayMatches.length===1?'':'es'}`
+      : `${dayMatches.length} played`;
+    return `
+    <details class="day-group"${isOpen?' open':''}>
+      <summary class="day-header">
+        <span class="day-chevron">▸</span>
+        <span class="day-label">${esc(fmtDate(day))}</span>
+        <span class="day-meta">${meta}</span>
+      </summary>
+      ${dayMatches.map(matchRow).join('')}
+    </details>`;
+  }).join('');
 }
 
 /* ============================================================
@@ -540,6 +691,18 @@ async function loadStreams() {
   } catch (e) { /* silent */ }
 }
 
+async function loadExternalRugby() {
+  // Only fetch when viewing rugby — no need to hit ultimaterugby for hockey/netball
+  if (currentSport !== 'rugby') { externalMatches = []; return; }
+  try {
+    const r = await fetch('/api/rugby-external');
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    externalMatches = j.matches || [];
+    if (tournamentData) renderFixtures(tournamentData);
+  } catch (e) { externalMatches = []; }
+}
+
 /* ============================================================
  * Event wiring
  * ============================================================ */
@@ -550,12 +713,14 @@ function setSport(sport) {
   currentKey = localStorage.getItem('wk-variant:' + sport) || SPORTS[sport].variants[0].key;
   renderSelectors();
   loadTournament();
+  loadExternalRugby();
 }
 function setVariant(key) {
   currentKey = key;
   localStorage.setItem('wk-variant:' + currentSport, key);
   renderSelectors();
   loadTournament();
+  loadExternalRugby();
 }
 function toggleFollow(teamId) {
   if (teamId == null || isNaN(teamId)) return;
@@ -602,8 +767,10 @@ document.getElementById('clearFollowBtn').addEventListener('click', () => {
 renderSelectors();
 loadTournament();
 loadStreams();
+loadExternalRugby();
 setInterval(loadTournament, 60_000);
 setInterval(loadStreams, 300_000);
+setInterval(loadExternalRugby, 180_000); // ultimaterugby refresh every 3 min
 </script>
 </body>
 </html>
