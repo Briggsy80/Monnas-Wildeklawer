@@ -1,5 +1,9 @@
 const SPORTIVO_API = 'https://sportivo.app/v1/generic/public/api_iframe_tournament_details';
-const TOURNAMENT_ID = 7094; // ABSA Wildeklawer Hockey Girls U19 2026
+
+const TOURNAMENTS = {
+  girls: 7094, // ABSA Wildeklawer Hockey Girls U19 2026
+  boys:  7095, // ABSA Wildeklawer Hockey Boys U19 2026
+};
 
 const PIXELLOT_API = 'https://supersportschools.watch.pixellot.tv/api/event/list';
 const PIXELLOT_EVENT_API = 'https://supersportschools.watch.pixellot.tv/api/event/get_by_id/id/';
@@ -8,33 +12,39 @@ const TOURNAMENT_SUBCATEGORY = '69b0f73fc3b2da2375c41437'; // ABSA Wildeklawer S
 
 const PINNED_EVENT_IDS = [];
 
-async function handleTournament() {
+function inferGender(title) {
+  const t = (title || '').toUpperCase();
+  if (t.includes('GIRLS')) return 'girls';
+  if (t.includes('BOYS'))  return 'boys';
+  return null;
+}
+
+async function handleTournament(url) {
+  const idParam = url.searchParams.get('id') || 'girls';
+  const tournamentId = TOURNAMENTS[idParam];
+  if (!tournamentId) {
+    return new Response(JSON.stringify({ error: 'Unknown tournament id' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' },
+    });
+  }
   try {
     const resp = await fetch(SPORTIVO_API, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Origin': 'https://sportivo.app',
-      },
-      body: JSON.stringify({ tournamentId: TOURNAMENT_ID }),
+      headers: { 'Content-Type': 'application/json', 'Origin': 'https://sportivo.app' },
+      body: JSON.stringify({ tournamentId }),
     });
     if (!resp.ok) {
       return new Response(JSON.stringify({ error: `Sportivo returned ${resp.status}` }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
+        status: 502, headers: { 'Content-Type': 'application/json' },
       });
     }
     const body = await resp.text();
     return new Response(body, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=30',
-      },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=30' },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Tournament fetch failed' }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
+      status: 502, headers: { 'Content-Type': 'application/json' },
     });
   }
 }
@@ -50,19 +60,13 @@ async function handleStreams() {
         try {
           resp = await fetch(PIXELLOT_API, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-project-id': PIXELLOT_PROJECT,
-            },
+            headers: { 'Content-Type': 'application/json', 'x-project-id': PIXELLOT_PROJECT },
             body: JSON.stringify({
               filters: { 'identities.id': TOURNAMENT_SUBCATEGORY, status },
-              limit: 20,
-              offset,
+              limit: 20, offset,
             }),
           });
-        } catch (fetchErr) {
-          break;
-        }
+        } catch (fetchErr) { break; }
         if (!resp.ok) break;
         const data = await resp.json();
         const total = data?.content?.entryCount || 0;
@@ -75,6 +79,7 @@ async function handleStreams() {
           events.push({
             id: e._id,
             title: e.title || '',
+            gender: inferGender(e.title),
             home: homeTeam.name || '',
             away: awayTeam.name || '',
             homeId: homeTeam.teamId || homeTeam.id || '',
@@ -107,6 +112,7 @@ async function handleStreams() {
         events.push({
           id: e._id || e.event_id || eid,
           title: e.title || '',
+          gender: inferGender(e.title),
           home: e.eventTeams?.homeTeam?.name || '',
           away: e.eventTeams?.awayTeam?.name || '',
           status: e.status || 'archived',
@@ -117,15 +123,11 @@ async function handleStreams() {
     }
 
     return new Response(JSON.stringify({ events }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=300',
-      },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Stream fetch failed', events: [] }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
+      status: 502, headers: { 'Content-Type': 'application/json' },
     });
   }
 }
@@ -133,12 +135,8 @@ async function handleStreams() {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === '/api/tournament') {
-      return handleTournament();
-    }
-    if (url.pathname === '/api/streams') {
-      return handleStreams();
-    }
+    if (url.pathname === '/api/tournament') return handleTournament(url);
+    if (url.pathname === '/api/streams')    return handleStreams();
     return env.ASSETS.fetch(request);
   },
 };
