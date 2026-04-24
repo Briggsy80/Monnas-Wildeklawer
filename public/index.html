@@ -116,6 +116,10 @@ header{background:linear-gradient(160deg,#0b1e35,#071428);border-bottom:2px soli
 .fix-badge.external{background:var(--surface2);color:var(--blue);border:1px solid var(--blue);}
 .fix-badge.external a{color:inherit;text-decoration:none;}
 .fix-row.provisional{border-left-style:dashed;opacity:.93;}
+.match-centre-btn{display:inline-flex;align-items:center;gap:4px;font-family:'Barlow Condensed',sans-serif;
+  font-weight:800;font-size:10px;padding:3px 8px;border-radius:4px;text-decoration:none;letter-spacing:.5px;
+  text-transform:uppercase;flex-shrink:0;background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);}
+.match-centre-btn:hover{border-color:var(--blue);color:var(--blue);}
 
 /* stream button */
 .stream-btn{display:inline-flex;align-items:center;gap:4px;font-family:'Barlow Condensed',sans-serif;font-weight:800;
@@ -332,6 +336,17 @@ function todayISO() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'Africa/Johannesburg' });
 }
 
+/* Monument is sometimes referred to as Monnas (Afrikaans nickname) —
+ * match both when auto-seeding followed teams and on the quick-action. */
+const MONUMENT_PATTERN = /\b(monument|monnas)\b/i;
+
+/* UTM tags for every outbound link (stream, resource PDFs, ultimaterugby). */
+const UTM = 'utm_source=monnas-wildeklawer&utm_medium=referral&utm_campaign=absa-wildeklawer-2026';
+function withUtm(url) {
+  if (!url) return url;
+  return url + (url.includes('?') ? '&' : '?') + UTM;
+}
+
 /* ============================================================
  * Helpers
  * ============================================================ */
@@ -357,10 +372,10 @@ function loadFollowed() {
   if (raw != null) {
     try { followed = new Set(JSON.parse(raw)); return; } catch (e) {}
   }
-  // first time: auto-seed Monument if present
+  // first time: auto-seed Monument / Monnas if present
   followed = new Set();
   for (const t of (tournamentData?.teams || [])) {
-    if ((t.teamName || '').includes('Monument') && t.teamId != null) followed.add(t.teamId);
+    if (MONUMENT_PATTERN.test(t.teamName || '') && t.teamId != null) followed.add(t.teamId);
   }
   saveFollowed();
 }
@@ -418,7 +433,7 @@ function streamBtn(s) {
   if (!s) return '';
   const label = s.status === 'live' ? 'LIVE' : s.status === 'archived' ? 'Replay' : 'Stream';
   const cls   = s.status === 'live' ? 'live'  : s.status === 'archived' ? 'vod'    : 'upcoming';
-  return `<a class="stream-btn ${cls}" href="${esc(s.url)}" target="_blank" rel="noopener">${label}</a>`;
+  return `<a class="stream-btn ${cls}" href="${esc(withUtm(s.url))}" target="_blank" rel="noopener">${label}</a>`;
 }
 
 /* ============================================================
@@ -434,7 +449,7 @@ function renderMeta(d) {
 
   const resources = d.resources || [];
   document.getElementById('resources').innerHTML = resources.length
-    ? resources.map(r => `<a class="resource-link" href="${esc(r.url)}" target="_blank" rel="noopener">
+    ? resources.map(r => `<a class="resource-link" href="${esc(withUtm(r.url))}" target="_blank" rel="noopener">
         <div class="resource-icon">PDF</div>
         <div><div>${esc(r.title)}</div><div style="font-size:10px;color:var(--text-dim);margin-top:2px;">${esc(r.description || '')}</div></div>
       </a>`).join('')
@@ -478,13 +493,16 @@ function matchRow(m) {
   const hasScore = typeof s1 === 'number' && typeof s2 === 'number';
   const stream = findStream(m.team1Name, m.team2Name, m.matchDateTime);
   const isProv = m.source === 'fallback' || m.source === 'ultimaterugby';
-  let provBadge = '';
+  let provBadge = '', matchCentreBtn = '';
   if (m.source === 'fallback') {
     provBadge = `<span class="fix-badge provisional" title="Scheduled fixture — will be replaced by live data when Sportivo publishes it">${esc(m.phaseLabel || 'Provisional')}</span>`;
   } else if (m.source === 'ultimaterugby') {
     const ageLabel = m.age ? m.age.toUpperCase() : '';
     const parts = [ageLabel, m.locationDisplay].filter(Boolean).join(' · ');
-    provBadge = `<span class="fix-badge external" title="via ultimaterugby.com"><a href="${esc(m.externalUrl||'#')}" target="_blank" rel="noopener">${esc(parts || 'ultimaterugby')}</a></span>`;
+    provBadge = `<span class="fix-badge external" title="Rugby fixture from ultimaterugby.com">${esc(parts || 'Rugby')}</span>`;
+    if (m.externalUrl) {
+      matchCentreBtn = `<a class="match-centre-btn" href="${esc(withUtm(m.externalUrl))}" target="_blank" rel="noopener" title="Open match centre on ultimaterugby.com">Match Centre ↗</a>`;
+    }
   } else if (m.age) {
     provBadge = `<span class="fix-badge age">${esc(m.age.toUpperCase())}</span>`;
   }
@@ -502,6 +520,7 @@ function matchRow(m) {
         <div class="fix-sub">
           ${m.locationDisplay && m.source !== 'ultimaterugby'?`<span class="fix-venue">📍 ${esc(m.locationDisplay)}</span>`:''}
           ${provBadge}
+          ${matchCentreBtn}
           ${streamBtn(stream)}
         </div>
       </div>
@@ -751,7 +770,7 @@ document.getElementById('followBadge').addEventListener('click', () => {
 });
 document.getElementById('followMonumentBtn').addEventListener('click', () => {
   for (const t of (tournamentData?.teams || [])) {
-    if ((t.teamName || '').includes('Monument') && t.teamId != null) followed.add(t.teamId);
+    if (MONUMENT_PATTERN.test(t.teamName || '') && t.teamId != null) followed.add(t.teamId);
   }
   saveFollowed(); renderFollowList();
   if (tournamentData) { renderFixtures(tournamentData); renderPools(tournamentData); renderBracket(tournamentData); }
