@@ -13,5 +13,11 @@
   // worker.js.
   "kv_namespaces": [
     { "binding": "EVENT_CACHE", "id": "4e936947f32a4abb87289898703d9da7" }
-  ]
+  ],
+  // Cron trigger runs the Pixellot stream refresh autonomously (not
+  // driven by page visits) so the KV index keeps accumulating events
+  // even overnight / when nobody is on the site. Every 5 minutes.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
 }

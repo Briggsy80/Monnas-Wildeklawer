@@ -380,4 +380,12 @@ export default {
     if (url.pathname === '/api/rugby-external') return handleRugbyExternal();
     return env.ASSETS.fetch(request);
   },
+
+  // Cron-scheduled refresh (configured via triggers.crons in wrangler.jsonc).
+  // Runs every 5 min regardless of visitor traffic, so the Pixellot list is
+  // scraped and any new event ids get persisted into KV even if no one is
+  // on the site. Response is discarded — we only care about the KV writes.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleStreams(env));
+  },
 };
