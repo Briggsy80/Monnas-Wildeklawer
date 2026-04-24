@@ -5,10 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monument — ABSA Wildeklawer 2026</title>
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAD/ElEQVR4nMWXzW8bRRiHn5nd9WftJCRt7CRFIUoqQIEDF4TEh0oPVUCIM/8CR46cuHKqKiE4gBCH0gNCqjhwAqFKcACaNpCUKCRNUuJ8NLazcez4c3dnONiO4yoh9gal72G92vXMPPPO7/3NjpientY8wRBa6ycKYCql8MNgGBKtNMpHWyFE617Xo8sOIF8oErAsgsHAqQBkt43rsILf7sxzZ2YeIQRKqa4hfAM0Q2lNamO7AeV7/O4BmumzLJPtR3bj2RkC1EMTDFg8Su+2QZ0ZgOM6WJZJJpunWqshpcTvKvgC8FxNKBQgly9g7+brD30KwR+A0hiGpOpUSWdstNa+vKRrACEEnueRydhEwkHefPUlUqlthBC+ddAxQHOAHTtHLl9gdXUdpSCX22d3N4eU/vR8ohNq3XC+/D63vr/Nyuo6xXKNja00htCMDCeIRSO8ODnO21df6wjkcLbMTkm10Ni5fcbHnqG3J8bk86N8fP0mm+l9YlGPsVIFIepO2c1ynIjb7Ks3HueD99/jXDTAhx9do1Sp4Tgus/cfsLa2ybtTryOl0fHAHQMAByrfzua49ukNFhaX+WNugd7eGPF4lIxd4IfbvwOgVHfV0JUIZ+cWmflzHq9apVKqUK3UyGZzFEsVvv3uZ1zX7VqMHW3HzR1wLbXFL7/eZW+vwOU3XuGf1DYbWxkikRChgMXVKy8TjYRP9ISuvwe6EVUnhnRsFRxu3NznpZSUy2Wy2R2kFCilUUoTDAXwXA+lNEJIEIpwOExfb2+jr5aAm5Vx1ETaMnD8TDWe51JzHCzDBASepzBMCRqElDhOjWAwWIc5ITttS6CU0k3CpaUVDENQqdYYHX2avxeXGRlK4Lge9s4uQ8MX2C8WKZbKDJ4fIJ2xiUQiVMtlkslB/lp4wMhQAuV55PZyJBJJCvkC6xubTIyPMTSUOMhqM6QQ4iBFNdfhs89vMn3vPkvLD9naTnN3ZpZKtcKXN75h5WGK7M4e2ayN8hR2bo/rn3zB9L05pGnw40/1SlBovvr6FqnUBvH4OTYfpYlGI0ealDyckp54jBcmLzEw0MdwcpBQwOLicJJYNMI7U1eQwuTicBKn6hAIBEleOM9zz06QSA5SqzhcmhilXKkQCgZ5a+oy0pD09/fxVF+Mnp74kQJt04DnKUzTOCBtpsvzPAyj5XKu62KYBp7b/L9C6cZEdF2kpmk0+vQOJvj475EiVEohhKBe+fUoFUtkbRsrYFGr1uiJxymUigRNC8dxULp+PohGwgz097d9KR+p/G59oGnFGkBzUI6tMmu8gLZMHRe+Dibi0KUlJt2o91aHpzKi/wrdfmkb6DTHS/NxorMO3yej/yv+Ba66L0CwT0vAAAAAAElFTkSuQmCC">
-<!-- Matomo -->
+<!-- Matomo (initial pageview fires from app code once state is known) -->
 <script>
   var _paq = window._paq = window._paq || [];
-  _paq.push(['trackPageView']);
   _paq.push(['enableLinkTracking']);
   (function() {
     var u="https://analytics.modernbiz.co.za/";
@@ -264,10 +263,54 @@ const SPORTS = {
 let currentSport    = localStorage.getItem('wk-sport') || 'hockey';
 if (!SPORTS[currentSport]) currentSport = 'hockey';
 let currentKey      = localStorage.getItem('wk-variant:' + currentSport) || SPORTS[currentSport].variants[0].key;
+let currentTab      = 'fixtures';
 let tournamentData  = null;
 let streams         = [];
 let followed        = new Set();
 let externalMatches = [];  // ultimaterugby scraped fixtures (rugby only)
+
+/* ============================================================
+ * Matomo analytics — virtual pageviews, custom dimensions, events
+ *
+ * Expected custom dimension configuration in Matomo admin
+ * (Action scope): 1=Sport, 2=AgeGroup, 3=Variant, 4=Tab.
+ * Pushes to unconfigured dimension IDs are silently ignored, so
+ * this is safe to run before an admin sets them up.
+ * ============================================================ */
+function ageFromVariant(key) {
+  const m = (key || '').match(/u(\d{2})$/);
+  return m ? 'u' + m[1] : 'u19'; // hockey variants don't carry age suffix
+}
+function variantLabel(key) {
+  const v = (SPORTS[currentSport]?.variants || []).find(x => x.key === key);
+  return v ? v.label : key;
+}
+function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function pushMatomoState() {
+  if (!window._paq) return;
+  const sport   = currentSport;
+  const variant = currentKey;
+  const age     = ageFromVariant(variant);
+  const tab     = currentTab;
+  // Synthesize a virtual URL so the Pages report shows a hierarchy:
+  //   /wildeklawer/<sport>/<variant>/<tab>
+  const url   = '/wildeklawer/' + sport + '/' + variant + '/' + tab;
+  const title = `${SPORTS[sport].label} · ${variantLabel(variant)} · ${cap(tab)}`;
+  _paq.push(['setCustomUrl', url]);
+  _paq.push(['setDocumentTitle', title]);
+  _paq.push(['setCustomDimension', 1, sport]);
+  _paq.push(['setCustomDimension', 2, age]);
+  _paq.push(['setCustomDimension', 3, variant]);
+  _paq.push(['setCustomDimension', 4, tab]);
+  _paq.push(['trackPageView']);
+}
+function trackEvent(category, action, name, value) {
+  if (!window._paq) return;
+  const args = ['trackEvent', category, action];
+  if (name  != null) args.push(name);
+  if (value != null) args.push(value);
+  _paq.push(args);
+}
 
 /* ============================================================
  * Hockey Day 2/3 fallback fixtures (transcribed from the
@@ -433,7 +476,8 @@ function streamBtn(s) {
   if (!s) return '';
   const label = s.status === 'live' ? 'LIVE' : s.status === 'archived' ? 'Replay' : 'Stream';
   const cls   = s.status === 'live' ? 'live'  : s.status === 'archived' ? 'vod'    : 'upcoming';
-  return `<a class="stream-btn ${cls}" href="${esc(withUtm(s.url))}" target="_blank" rel="noopener">${label}</a>`;
+  const trackName = s.title || `${s.home} vs ${s.away}`;
+  return `<a class="stream-btn ${cls}" href="${esc(withUtm(s.url))}" target="_blank" rel="noopener" data-track="Streams|${esc(label)}" data-track-name="${esc(trackName)}">${label}</a>`;
 }
 
 /* ============================================================
@@ -449,7 +493,7 @@ function renderMeta(d) {
 
   const resources = d.resources || [];
   document.getElementById('resources').innerHTML = resources.length
-    ? resources.map(r => `<a class="resource-link" href="${esc(withUtm(r.url))}" target="_blank" rel="noopener">
+    ? resources.map(r => `<a class="resource-link" href="${esc(withUtm(r.url))}" target="_blank" rel="noopener" data-track="Resources|Open" data-track-name="${esc(r.title)}">
         <div class="resource-icon">PDF</div>
         <div><div>${esc(r.title)}</div><div style="font-size:10px;color:var(--text-dim);margin-top:2px;">${esc(r.description || '')}</div></div>
       </a>`).join('')
@@ -501,7 +545,7 @@ function matchRow(m) {
     const parts = [ageLabel, m.locationDisplay].filter(Boolean).join(' · ');
     provBadge = `<span class="fix-badge external" title="Rugby fixture from ultimaterugby.com">${esc(parts || 'Rugby')}</span>`;
     if (m.externalUrl) {
-      matchCentreBtn = `<a class="match-centre-btn" href="${esc(withUtm(m.externalUrl))}" target="_blank" rel="noopener" title="Open match centre on ultimaterugby.com">Match Centre ↗</a>`;
+      matchCentreBtn = `<a class="match-centre-btn" href="${esc(withUtm(m.externalUrl))}" target="_blank" rel="noopener" title="Open match centre on ultimaterugby.com" data-track="External|Match Centre" data-track-name="${esc(m.team1Name + ' vs ' + m.team2Name)}">Match Centre ↗</a>`;
     }
   } else if (m.age) {
     provBadge = `<span class="fix-badge age">${esc(m.age.toUpperCase())}</span>`;
@@ -733,6 +777,8 @@ function setSport(sport) {
   renderSelectors();
   loadTournament();
   loadExternalRugby();
+  trackEvent('Navigation', 'Select Sport', sport);
+  pushMatomoState();
 }
 function setVariant(key) {
   currentKey = key;
@@ -740,13 +786,18 @@ function setVariant(key) {
   renderSelectors();
   loadTournament();
   loadExternalRugby();
+  trackEvent('Navigation', 'Select Variant', key);
+  pushMatomoState();
 }
 function toggleFollow(teamId) {
   if (teamId == null || isNaN(teamId)) return;
+  const teamName = ((tournamentData?.teams) || []).find(t => t.teamId === teamId)?.teamName || String(teamId);
+  const action = followed.has(teamId) ? 'Unfollow' : 'Follow';
   if (followed.has(teamId)) followed.delete(teamId); else followed.add(teamId);
   saveFollowed();
   renderFollowList();
   if (tournamentData) { renderFixtures(tournamentData); renderPools(tournamentData); renderBracket(tournamentData); }
+  trackEvent('Follow', action, `${currentKey} · ${teamName}`);
 }
 
 document.getElementById('sportRow').addEventListener('click', e => {
@@ -760,6 +811,9 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
   document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   document.getElementById('tab-' + b.dataset.tab).classList.add('active');
+  currentTab = b.dataset.tab;
+  trackEvent('Navigation', 'Switch Tab', currentTab);
+  pushMatomoState();
 }));
 document.getElementById('followList').addEventListener('click', e => {
   const row = e.target.closest('.follow-row'); if (row) toggleFollow(Number(row.dataset.teamId));
@@ -780,10 +834,21 @@ document.getElementById('clearFollowBtn').addEventListener('click', () => {
   if (tournamentData) { renderFixtures(tournamentData); renderPools(tournamentData); renderBracket(tournamentData); }
 });
 
+/* Delegated click tracking — any <a data-track="Category|Action">
+ * fires a Matomo event. Works across all re-rendered content. */
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-track]');
+  if (!a) return;
+  const [category, action] = (a.dataset.track || '').split('|');
+  if (!category || !action) return;
+  trackEvent(category, action, a.dataset.trackName || a.textContent.trim());
+});
+
 /* ============================================================
  * Boot
  * ============================================================ */
 renderSelectors();
+pushMatomoState();          // initial virtual pageview for current state
 loadTournament();
 loadStreams();
 loadExternalRugby();
