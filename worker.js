@@ -81,7 +81,106 @@ async function handleTournament(url) {
   }
 }
 
-async function handleStreams() {
+/* Shape a Pixellot event object into the frontend's stream shape. */
+function shapeEvent(e, fallbackStatus) {
+  const sport = inferSport(e.title);
+  if (!sport) return null;
+  const homeTeam = e.eventTeams?.homeTeam || {};
+  const awayTeam = e.eventTeams?.awayTeam || {};
+  const id = e._id || e.event_id;
+  if (!id) return null;
+  return {
+    id,
+    title: e.title || '',
+    sport,
+    gender: inferGender(e.title),
+    age:    inferAge(e.title),
+    home: homeTeam.name || '',
+    away: awayTeam.name || '',
+    homeId: homeTeam.teamId || homeTeam.id || '',
+    awayId: awayTeam.teamId || awayTeam.id || '',
+    homeLogo: homeTeam.logo || '',
+    awayLogo: awayTeam.logo || '',
+    status: e.status || fallbackStatus || 'archived',
+    date: e.event_date || 0,
+    url: `https://live.supersportschools.com/events/${id}/`,
+  };
+}
+
+/* KV-backed auto-pinning.
+ *
+ * Pixellot's list API only exposes a rolling window of ~20 upcoming + 20
+ * archived + live events, and ignores the offset parameter. Anything
+ * outside that window is invisible.
+ *
+ * When the EVENT_CACHE KV namespace is bound, every event we ever see
+ * gets remembered: its shaped data is cached (6h TTL) and its id is
+ * added to a persistent index. On each refresh, events in the index but
+ * missing from the current list response are served from the cache (or
+ * re-fetched from Pixellot by id if the cache has expired). Result:
+ * once a stream has been visible to the worker even once, it stays
+ * accessible for the remainder of the tournament.
+ *
+ * The code is a no-op when the binding is absent, so this is safe to
+ * deploy before you've created the KV namespace.
+ */
+const KV_INDEX_KEY = 'events:index';
+const KV_EVENT_TTL = 6 * 3600; // seconds
+
+async function kvRemember(env, events) {
+  if (!env?.EVENT_CACHE) return;
+  const kv = env.EVENT_CACHE;
+  let index = [];
+  try { index = (await kv.get(KV_INDEX_KEY, 'json')) || []; } catch (e) {}
+  const indexSet = new Set(index);
+  let indexChanged = false;
+  for (const e of events) {
+    if (!indexSet.has(e.id)) { indexSet.add(e.id); indexChanged = true; }
+  }
+  // Cache every live/current event's shaped data (cheap individual writes).
+  // Skip writing if the event is already cached with the same status — keeps
+  // within KV write limits on the free tier.
+  await Promise.all(events.map(async e => {
+    try {
+      const existing = await kv.get('events:' + e.id, 'json');
+      if (existing && existing.status === e.status && existing.date === e.date) return;
+      await kv.put('events:' + e.id, JSON.stringify(e), { expirationTtl: KV_EVENT_TTL });
+    } catch (err) { /* swallow individual KV errors */ }
+  }));
+  if (indexChanged) {
+    try { await kv.put(KV_INDEX_KEY, JSON.stringify([...indexSet])); } catch (e) {}
+  }
+}
+
+async function kvRehydrateMissing(env, alreadySeen) {
+  if (!env?.EVENT_CACHE) return [];
+  const kv = env.EVENT_CACHE;
+  let index = [];
+  try { index = (await kv.get(KV_INDEX_KEY, 'json')) || []; } catch (e) {}
+  const missing = index.filter(id => !alreadySeen.has(id));
+  const rehydrated = [];
+  for (const id of missing) {
+    // First try the cached event data (fast, no upstream call)
+    let cached = null;
+    try { cached = await kv.get('events:' + id, 'json'); } catch (e) {}
+    if (cached) { rehydrated.push(cached); continue; }
+    // Cache expired — re-fetch from Pixellot by id and re-cache
+    try {
+      const resp = await fetch(PIXELLOT_EVENT_API + id, {
+        headers: { 'x-project-id': PIXELLOT_PROJECT },
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const shaped = shapeEvent(data?.content || {}, 'archived');
+      if (!shaped) continue;
+      rehydrated.push(shaped);
+      try { await kv.put('events:' + id, JSON.stringify(shaped), { expirationTtl: KV_EVENT_TTL }); } catch (e) {}
+    } catch (err) { /* skip individual failures */ }
+  }
+  return rehydrated;
+}
+
+async function handleStreams(env) {
   try {
     const events = [];
     for (const status of ['live', 'archived', 'upcoming']) {
@@ -104,26 +203,8 @@ async function handleStreams() {
         const total = data?.content?.entryCount || 0;
         const entries = data?.content?.entries || [];
         for (const e of entries) {
-          const sport = inferSport(e.title);
-          if (!sport) continue;
-          const homeTeam = e.eventTeams?.homeTeam || {};
-          const awayTeam = e.eventTeams?.awayTeam || {};
-          events.push({
-            id: e._id,
-            title: e.title || '',
-            sport,
-            gender: inferGender(e.title),
-            age:    inferAge(e.title),
-            home: homeTeam.name || '',
-            away: awayTeam.name || '',
-            homeId: homeTeam.teamId || homeTeam.id || '',
-            awayId: awayTeam.teamId || awayTeam.id || '',
-            homeLogo: homeTeam.logo || '',
-            awayLogo: awayTeam.logo || '',
-            status: e.status || status,
-            date: e.event_date || 0,
-            url: `https://live.supersportschools.com/events/${e._id}/`,
-          });
+          const shaped = shapeEvent(e, status);
+          if (shaped) events.push(shaped);
         }
         offset += entries.length;
         if (offset >= total || entries.length === 0) break;
@@ -139,23 +220,19 @@ async function handleStreams() {
         });
         if (!resp.ok) continue;
         const data = await resp.json();
-        const e = data?.content;
-        if (!e) continue;
-        const sport = inferSport(e.title);
-        if (!sport) continue;
-        events.push({
-          id: e._id || e.event_id || eid,
-          title: e.title || '',
-          sport,
-          gender: inferGender(e.title),
-          age:    inferAge(e.title),
-          home: e.eventTeams?.homeTeam?.name || '',
-          away: e.eventTeams?.awayTeam?.name || '',
-          status: e.status || 'archived',
-          date: e.event_date || 0,
-          url: `https://live.supersportschools.com/events/${eid}/`,
-        });
+        const shaped = shapeEvent(data?.content || {}, 'archived');
+        if (!shaped) continue;
+        events.push(shaped);
+        seenIds.add(shaped.id);
       } catch (err) { /* skip */ }
+    }
+
+    // Remember everything we've seen, then rehydrate events that have
+    // since dropped off the Pixellot list window (see kvRemember above).
+    await kvRemember(env, events);
+    const rehydrated = await kvRehydrateMissing(env, seenIds);
+    for (const e of rehydrated) {
+      if (!seenIds.has(e.id)) { events.push(e); seenIds.add(e.id); }
     }
 
     return new Response(JSON.stringify({ events }), {
@@ -299,7 +376,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/api/tournament')     return handleTournament(url);
-    if (url.pathname === '/api/streams')        return handleStreams();
+    if (url.pathname === '/api/streams')        return handleStreams(env);
     if (url.pathname === '/api/rugby-external') return handleRugbyExternal();
     return env.ASSETS.fetch(request);
   },

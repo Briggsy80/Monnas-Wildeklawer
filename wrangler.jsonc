@@ -7,4 +7,16 @@
     "directory": "public",
     "binding": "ASSETS"
   }
+  // KV binding for auto-pinning Pixellot stream events that drop off the
+  // list API window. Activate by:
+  //   1) npx wrangler kv namespace create EVENT_CACHE
+  //      (prints: id = "<namespace-id>")
+  //   2) Uncomment the block below and paste the namespace id.
+  //   3) npx wrangler deploy (or push to main for GitHub-triggered deploy).
+  // The worker handles the binding gracefully — until it's set, streams
+  // work as before from the rolling Pixellot list window only.
+  //
+  // "kv_namespaces": [
+  //   { "binding": "EVENT_CACHE", "id": "PASTE_NAMESPACE_ID_HERE" }
+  // ]
 }
