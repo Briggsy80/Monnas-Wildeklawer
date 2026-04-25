@@ -24,9 +24,17 @@ const PINNED_EVENT_IDS = [
   // Hockey — Sat 25 Apr
   '69e735df467cdd26ec56a830', // Girls: HS Durbanville vs HS Sentraal       - 09:00 (slot was Monument vs Northern Cape; SSS repurposed the ID once Monument went off air)
   '69e92618e8b52c99177d9d58', // Boys:  HS Monument vs Kimberley Boys HS    - 07:30
-  // Rugby — Sat 25 Apr
-  '69e5d7e6d3d01762105efacc', // U15:   HS Monument vs Durban HS            - 07:55
 ];
+
+/* Stream scraping is hockey-only.
+ *
+ * Per Matomo for week of 19–25 Apr 2026, stream-button clicks were
+ * 96% hockey, 2% netball, 1% rugby (5 non-hockey clicks total). Caching
+ * non-hockey events via KV was burning ~40% of read budget for
+ * effectively zero engagement, so handleStreams + kvRehydrateMissing
+ * filter to hockey only. Rugby/netball fixtures still render from
+ * Sportivo; they just don't get stream buttons. */
+const STREAM_SPORTS = new Set(['hockey']);
 
 function inferSport(title) {
   const t = (title || '').toUpperCase();
@@ -154,11 +162,16 @@ async function kvRehydrateMissing(env, alreadySeen) {
   try { index = (await kv.get(KV_INDEX_KEY, 'json')) || []; } catch (e) {}
   const missing = index.filter(id => !alreadySeen.has(id));
   const rehydrated = [];
+  const prune = new Set(); // non-tracked-sport ids — drop from index
   for (const id of missing) {
     // First try the cached event data (fast, no upstream call)
     let cached = null;
     try { cached = await kv.get('events:' + id, 'json'); } catch (e) {}
-    if (cached) { rehydrated.push(cached); continue; }
+    if (cached) {
+      if (STREAM_SPORTS.has(cached.sport)) rehydrated.push(cached);
+      else prune.add(id);
+      continue;
+    }
     // Cache expired — re-fetch from Pixellot by id and re-cache
     try {
       const resp = await fetch(PIXELLOT_EVENT_API + id, {
@@ -168,9 +181,14 @@ async function kvRehydrateMissing(env, alreadySeen) {
       const data = await resp.json();
       const shaped = shapeEvent(data?.content || {}, 'archived');
       if (!shaped) continue;
+      if (!STREAM_SPORTS.has(shaped.sport)) { prune.add(id); continue; }
       rehydrated.push(shaped);
       try { await kv.put('events:' + id, JSON.stringify(shaped), { expirationTtl: KV_EVENT_TTL }); } catch (e) {}
     } catch (err) { /* skip individual failures */ }
+  }
+  if (prune.size) {
+    const cleaned = index.filter(id => !prune.has(id));
+    try { await kv.put(KV_INDEX_KEY, JSON.stringify(cleaned)); } catch (e) {}
   }
   return rehydrated;
 }
@@ -199,7 +217,7 @@ async function handleStreams(env) {
         const entries = data?.content?.entries || [];
         for (const e of entries) {
           const shaped = shapeEvent(e, status);
-          if (shaped) events.push(shaped);
+          if (shaped && STREAM_SPORTS.has(shaped.sport)) events.push(shaped);
         }
         offset += entries.length;
         if (offset >= total || entries.length === 0) break;
@@ -216,7 +234,7 @@ async function handleStreams(env) {
         if (!resp.ok) continue;
         const data = await resp.json();
         const shaped = shapeEvent(data?.content || {}, 'archived');
-        if (!shaped) continue;
+        if (!shaped || !STREAM_SPORTS.has(shaped.sport)) continue;
         events.push(shaped);
         seenIds.add(shaped.id);
       } catch (err) { /* skip */ }
