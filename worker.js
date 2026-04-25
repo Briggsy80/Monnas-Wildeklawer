@@ -22,10 +22,10 @@ const TOURNAMENT_SUBCATEGORY = '69b0f73fc3b2da2375c41437'; // ABSA Wildeklawer S
 // costs one extra GET on the streams refresh (5-min cache at the edge).
 const PINNED_EVENT_IDS = [
   // Hockey — Sat 25 Apr
-  '69e735df467cdd26ec56a830', // Girls: HS Monument vs Northern Cape HS    - 08:30
-  '69e92618e8b52c99177d9d58', // Boys:  HS Monument vs Kimberley Boys HS   - 07:30
+  '69e735df467cdd26ec56a830', // Girls: HS Durbanville vs HS Sentraal       - 09:00 (slot was Monument vs Northern Cape; SSS repurposed the ID once Monument went off air)
+  '69e92618e8b52c99177d9d58', // Boys:  HS Monument vs Kimberley Boys HS    - 07:30
   // Rugby — Sat 25 Apr
-  '69e5d7e6d3d01762105efacc', // U15:   HS Monument vs Durban HS           - 07:55
+  '69e5d7e6d3d01762105efacc', // U15:   HS Monument vs Durban HS            - 07:55
 ];
 
 function inferSport(title) {
