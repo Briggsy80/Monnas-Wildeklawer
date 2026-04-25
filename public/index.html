@@ -112,13 +112,7 @@ header{background:linear-gradient(160deg,#0b1e35,#071428);border-bottom:2px soli
   padding:2px 6px;border-radius:3px;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0;}
 .fix-badge.age{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);}
 .fix-badge.provisional{background:#2a1f0a;color:var(--amber);border:1px solid var(--gold-dim);}
-.fix-badge.external{background:var(--surface2);color:var(--blue);border:1px solid var(--blue);}
-.fix-badge.external a{color:inherit;text-decoration:none;}
 .fix-row.provisional{border-left-style:dashed;opacity:.93;}
-.match-centre-btn{display:inline-flex;align-items:center;gap:4px;font-family:'Barlow Condensed',sans-serif;
-  font-weight:800;font-size:10px;padding:3px 8px;border-radius:4px;text-decoration:none;letter-spacing:.5px;
-  text-transform:uppercase;flex-shrink:0;background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);}
-.match-centre-btn:hover{border-color:var(--blue);color:var(--blue);}
 
 /* stream button */
 .stream-btn{display:inline-flex;align-items:center;gap:4px;font-family:'Barlow Condensed',sans-serif;font-weight:800;
@@ -139,6 +133,28 @@ table.log td.team{text-align:left;font-weight:600;padding-left:12px;white-space:
 table.log td.team img{height:16px;width:16px;vertical-align:middle;margin-right:6px;border-radius:2px;background:#fff;}
 table.log tr.followed td{color:var(--gold);background:#0d1e32;}
 table.log td.pts{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;}
+
+/* festival (rugby — derived per-team result list, no real pool log) */
+.festival-card.followed{border-color:var(--gold-dim);}
+.festival-card .group-header{display:flex;align-items:center;gap:10px;}
+.festival-card.followed .group-header{color:var(--gold);}
+.festival-team-logo{height:18px;width:18px;border-radius:2px;background:#fff;flex-shrink:0;}
+.festival-summary{margin-left:auto;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
+  color:var(--text-dim);text-transform:none;letter-spacing:0;}
+.festival-card.followed .festival-summary{color:var(--gold);}
+.festival-row{display:grid;grid-template-columns:22px 18px 1fr auto auto;align-items:center;gap:8px;
+  padding:7px 12px;font-size:12px;border-bottom:1px solid var(--border);}
+.festival-row:last-child{border-bottom:none;}
+.festival-result{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:13px;text-align:center;color:var(--muted);}
+.festival-result.w{color:var(--green);}
+.festival-result.l{color:#d96666;}
+.festival-result.d{color:var(--gold);}
+.festival-row img{height:18px;width:18px;border-radius:2px;background:#fff;}
+.festival-opp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.festival-score{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--text);min-width:48px;text-align:right;}
+.festival-row.pending .festival-score{color:var(--text-dim);font-weight:600;}
+.festival-venue{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
 
 /* bracket */
 .bracket{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;}
@@ -267,7 +283,6 @@ let currentTab      = 'fixtures';
 let tournamentData  = null;
 let streams         = [];
 let followed        = new Set();
-let externalMatches = [];  // ultimaterugby scraped fixtures (rugby only)
 
 /* ============================================================
  * Matomo analytics — virtual pageviews, custom dimensions, events
@@ -383,7 +398,7 @@ function todayISO() {
  * match both when auto-seeding followed teams and on the quick-action. */
 const MONUMENT_PATTERN = /\b(monument|monnas)\b/i;
 
-/* UTM tags for every outbound link (stream, resource PDFs, ultimaterugby). */
+/* UTM tags for every outbound link (stream, resource PDFs). */
 const UTM = 'utm_source=monnas-wildeklawer&utm_medium=referral&utm_campaign=absa-wildeklawer-2026';
 function withUtm(url) {
   if (!url) return url;
@@ -553,6 +568,10 @@ function renderMeta(d) {
  * ============================================================ */
 function renderPools(d) {
   const el = document.getElementById('pools');
+  // Rugby has no pool/log structure on Sportivo (matchResultRule "No Points",
+  // every team plays only 2 fixtures). Show a per-team festival results
+  // card derived from the fixture list instead.
+  if (currentSport === 'rugby') return renderRugbyFestival(d, el);
   const groups = d.groups || [];
   if (!groups.length) {
     el.innerHTML = '<div class="empty">Pools not yet drawn for this tournament.<br>Check the Info tab to see which teams have entered.</div>';
@@ -575,6 +594,68 @@ function renderPools(d) {
     </div>`).join('');
 }
 
+function renderRugbyFestival(d, el) {
+  const teams = d.teams || [];
+  const matches = (d.extraPhases || []).flatMap(p => (p?.matches) || []);
+  if (!teams.length || !matches.length) {
+    el.innerHTML = '<div class="empty">Rugby is a festival format — no pool standings.<br>See the Fixtures tab for the full schedule.</div>';
+    return;
+  }
+  const byTeam = new Map();
+  for (const t of teams) byTeam.set(t.teamId, { team: t, matches: [] });
+  for (const m of matches) {
+    const e1 = byTeam.get(m.team1Id);
+    if (e1) e1.matches.push({ oppId: m.team2Id, oppName: m.team2Name, oppLogo: m.team2Logo, my: m.team1GoalsFor, them: m.team2GoalsFor, when: m.matchDateTime, venue: m.locationDisplay });
+    const e2 = byTeam.get(m.team2Id);
+    if (e2) e2.matches.push({ oppId: m.team1Id, oppName: m.team1Name, oppLogo: m.team1Logo, my: m.team2GoalsFor, them: m.team1GoalsFor, when: m.matchDateTime, venue: m.locationDisplay });
+  }
+  const entries = [...byTeam.values()].filter(e => e.matches.length);
+  if (!entries.length) {
+    el.innerHTML = '<div class="empty">Rugby is a festival format — no pool standings.<br>See the Fixtures tab for the full schedule.</div>';
+    return;
+  }
+  for (const e of entries) e.matches.sort((a, b) => (a.when || '').localeCompare(b.when || ''));
+  entries.sort((a, b) => {
+    const af = isFollowed(a.team.teamId), bf = isFollowed(b.team.teamId);
+    if (af !== bf) return (bf?1:0) - (af?1:0);
+    return (a.team.teamName || '').localeCompare(b.team.teamName || '');
+  });
+  const undrawn = teams.length - entries.length;
+  el.innerHTML = entries.map(({ team, matches }) => {
+    let w = 0, dr = 0, l = 0, pf = 0, pa = 0, played = 0;
+    for (const m of matches) {
+      if (typeof m.my === 'number' && typeof m.them === 'number') {
+        played++; pf += m.my; pa += m.them;
+        if (m.my > m.them) w++; else if (m.my < m.them) l++; else dr++;
+      }
+    }
+    const diff = pf - pa;
+    const summary = played
+      ? `${w}W-${dr}D-${l}L · ${pf}–${pa} (${diff>=0?'+':''}${diff})`
+      : `${matches.length} fixture${matches.length===1?'':'s'}`;
+    const rows = matches.map(m => {
+      const hasScore = typeof m.my === 'number' && typeof m.them === 'number';
+      const result = hasScore ? (m.my > m.them ? 'W' : m.my < m.them ? 'L' : 'D') : '';
+      const score = hasScore ? `${m.my}–${m.them}` : esc(fmtTime(m.when) || '—');
+      return `<div class="festival-row ${hasScore?'':'pending'}">
+        <span class="festival-result ${result.toLowerCase()}">${result || '·'}</span>
+        ${m.oppLogo?`<img src="${esc(m.oppLogo)}" alt="">`:'<span></span>'}
+        <span class="festival-opp">${esc(m.oppName || 'TBC')}</span>
+        <span class="festival-score">${score}</span>
+        <span class="festival-venue">${esc(m.venue || '')}</span>
+      </div>`;
+    }).join('');
+    return `<div class="group-card festival-card ${isFollowed(team.teamId)?'followed':''}">
+      <div class="group-header">
+        ${team.organisationLogo?`<img class="festival-team-logo" src="${esc(team.organisationLogo)}" alt="">`:''}
+        <span>${esc(team.teamName)}</span>
+        <span class="festival-summary">${summary}</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('') + (undrawn > 0 ? `<div class="empty" style="margin-top:8px;font-size:11px;">${undrawn} entered team${undrawn===1?'':'s'} not in the current draw — see Info tab for the full entry list.</div>` : '');
+}
+
 /* ============================================================
  * Render: fixtures
  * ============================================================ */
@@ -584,17 +665,10 @@ function matchRow(m, isScrollAnchor) {
   const s1 = m.team1GoalsFor, s2 = m.team2GoalsFor;
   const hasScore = typeof s1 === 'number' && typeof s2 === 'number';
   const stream = findStream(m.team1Name, m.team2Name, m.matchDateTime);
-  const isProv = m.source === 'fallback' || m.source === 'ultimaterugby';
-  let provBadge = '', matchCentreBtn = '';
+  const isProv = m.source === 'fallback';
+  let provBadge = '';
   if (m.source === 'fallback') {
     provBadge = `<span class="fix-badge provisional" title="Scheduled fixture — will be replaced by live data when Sportivo publishes it">${esc(m.phaseLabel || 'Provisional')}</span>`;
-  } else if (m.source === 'ultimaterugby') {
-    const ageLabel = m.age ? m.age.toUpperCase() : '';
-    const parts = [ageLabel, m.locationDisplay].filter(Boolean).join(' · ');
-    provBadge = `<span class="fix-badge external" title="Rugby fixture from ultimaterugby.com">${esc(parts || 'Rugby')}</span>`;
-    if (m.externalUrl) {
-      matchCentreBtn = `<a class="match-centre-btn" href="${esc(withUtm(m.externalUrl))}" target="_blank" rel="noopener" title="Open match centre on ultimaterugby.com" data-track="External|Match Centre" data-track-name="${esc(m.team1Name + ' vs ' + m.team2Name)}">Match Centre ↗</a>`;
-    }
   } else if (m.age) {
     provBadge = `<span class="fix-badge age">${esc(m.age.toUpperCase())}</span>`;
   }
@@ -610,9 +684,8 @@ function matchRow(m, isScrollAnchor) {
           ${m.team2Logo?`<img src="${esc(m.team2Logo)}" alt="">`:''}
         </div>
         <div class="fix-sub">
-          ${m.locationDisplay && m.source !== 'ultimaterugby'?`<span class="fix-venue">📍 ${esc(m.locationDisplay)}</span>`:''}
+          ${m.locationDisplay?`<span class="fix-venue">📍 ${esc(m.locationDisplay)}</span>`:''}
           ${provBadge}
-          ${matchCentreBtn}
           ${streamBtn(stream)}
         </div>
       </div>
@@ -638,32 +711,17 @@ function mergeFixtures(sportivo) {
       merged.push(fb);
     }
   }
-
-  // External rugby matches (only when viewing a rugby tournament)
-  if (currentSport === 'rugby' && externalMatches.length) {
-    const currentAge = (tournamentData?.ageGroupDescription || '').toLowerCase();
-    for (const ext of externalMatches) {
-      // Filter by age: skip if external match has an age that doesn't match selected
-      if (ext.age && currentAge && ext.age !== currentAge) continue;
-      // Per-match dedupe: skip if Sportivo has an equivalent fixture on that date
-      const day = (ext.matchDateTime || '').slice(0,10);
-      const n1 = normTeam(ext.team1Name), n2 = normTeam(ext.team2Name);
-      const overlap = sportivo.some(s => {
-        if ((s.matchDateTime || '').slice(0,10) !== day) return false;
-        const sn1 = normTeam(s.team1Name), sn2 = normTeam(s.team2Name);
-        return (teamsMatch(n1, sn1) && teamsMatch(n2, sn2)) ||
-               (teamsMatch(n1, sn2) && teamsMatch(n2, sn1));
-      });
-      if (overlap) continue;
-      merged.push(ext);
-    }
-  }
   return merged;
 }
 
 function renderFixtures(d) {
   const el = document.getElementById('fixtures');
-  const sportivo = (d.phases?.[0]?.matches) || [];
+  // Hockey/netball publish fixtures under phases[0]; rugby tournaments
+  // publish the same pool-stage data under extraPhases. Pull from both.
+  const sportivo = [
+    ...((d.phases?.[0]?.matches) || []),
+    ...((d.extraPhases || []).flatMap(p => (p?.matches) || [])),
+  ];
   const matches = mergeFixtures(sportivo);
   if (!matches.length) {
     el.innerHTML = '<div class="empty">Fixtures not yet published for this tournament.<br>They will appear here automatically once the organisers release them.</div>';
@@ -735,7 +793,10 @@ function renderBracket(d) {
   const el = document.getElementById('bracket');
   const knockoutPhases = [];
   (d.phases || []).slice(1).forEach(p => { if ((p.matches||[]).length) knockoutPhases.push(p); });
-  (d.extraPhases || []).forEach(p => { if (p && (p.matches||[]).length) knockoutPhases.push(p); });
+  // Rugby's extraPhases holds the pool stage (already shown in Fixtures), not a knockout draw — skip it here.
+  if (currentSport !== 'rugby') {
+    (d.extraPhases || []).forEach(p => { if (p && (p.matches||[]).length) knockoutPhases.push(p); });
+  }
 
   if (!knockoutPhases.length) {
     el.innerHTML = '<div class="empty">Knockout bracket not yet published. This section will populate automatically once the organisers release the draw.</div>';
@@ -836,18 +897,6 @@ async function loadStreams() {
   } catch (e) { /* silent */ }
 }
 
-async function loadExternalRugby() {
-  // Only fetch when viewing rugby — no need to hit ultimaterugby for hockey/netball
-  if (currentSport !== 'rugby') { externalMatches = []; return; }
-  try {
-    const r = await fetch('/api/rugby-external');
-    if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
-    externalMatches = j.matches || [];
-    if (tournamentData) renderFixtures(tournamentData);
-  } catch (e) { externalMatches = []; }
-}
-
 /* ============================================================
  * Event wiring
  * ============================================================ */
@@ -858,7 +907,6 @@ function setSport(sport) {
   currentKey = localStorage.getItem('wk-variant:' + sport) || SPORTS[sport].variants[0].key;
   renderSelectors();
   loadTournament();
-  loadExternalRugby();
   trackEvent('Navigation', 'Select Sport', sport);
   pushMatomoState();
 }
@@ -867,7 +915,6 @@ function setVariant(key) {
   localStorage.setItem('wk-variant:' + currentSport, key);
   renderSelectors();
   loadTournament();
-  loadExternalRugby();
   trackEvent('Navigation', 'Select Variant', key);
   pushMatomoState();
 }
@@ -933,10 +980,8 @@ renderSelectors();
 pushMatomoState();          // initial virtual pageview for current state
 loadTournament();
 loadStreams();
-loadExternalRugby();
 setInterval(loadTournament, 60_000);
 setInterval(loadStreams, 300_000);
-setInterval(loadExternalRugby, 180_000); // ultimaterugby refresh every 3 min
 </script>
 </body>
 </html>

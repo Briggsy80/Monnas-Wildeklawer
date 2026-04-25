@@ -28,11 +28,6 @@ const PINNED_EVENT_IDS = [
   '69e5d7e6d3d01762105efacc', // U15:   HS Monument vs Durban HS           - 07:55
 ];
 
-const ULTIMATERUGBY_URL = 'https://www.ultimaterugby.com/wildeklawer-rugby/matches';
-const WK_RUGBY_VENUES = ['diamantveld', 'kbh', 'laerskool staats', 'alternatiewe', 'spu'];
-
-const MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
-
 function inferSport(title) {
   const t = (title || '').toUpperCase();
   if (t.includes('HOCKEY'))  return 'hockey';
@@ -245,139 +240,11 @@ async function handleStreams(env) {
   }
 }
 
-/* ── Ultimaterugby scraper (rugby fallback) ─────────────────────────
- * Parses the public /wildeklawer-rugby/matches page into a list of
- * rugby fixtures with team names, date, time, venue, and (when played)
- * score. No auth or API key needed.
- *
- * Per-match block shape in the HTML:
- *   <div class="match-item">
- *     <a href="/match/{slug}/{id}">{Team1} Vs {Team2} at {Venue} {NNth} {Mon} {YYYY}</a>
- *     <div class="team-home">...<span class="team-name">T1</span>...</div>
- *     <div class="status">
- *       <span class="time">HH:MM</span>   (future)  OR
- *       <span class="score">X</span><span class="score">Y</span>  (played)
- *     </div>
- *     <div class="team-away">...<span class="team-name">T2</span>...</div>
- *   </div>
- */
-function inferAgeFromRugbyMatch(venue, team1, team2) {
-  // 1) team-name suffix wins (o/14, u15, "U/16" etc.)
-  const combined = (team1 + ' ' + team2).toLowerCase();
-  const m = combined.match(/\b[ou][\s\/]*(?:nder\s*)?(14|15|16|19)\b/);
-  if (m) return 'u' + m[1];
-  // 2) venue defaults — A Veld at Diamantveld = U19 festival main field
-  const v = (venue || '').toLowerCase();
-  if (v.includes('a veld')) return 'u19';
-  // 3) unknown
-  return null;
-}
-function parseUltimateRugbyDate(title) {
-  // e.g. "... at Diamantveld A Veld 24th Apr 2026"
-  const m = title.match(/\s+(\d{1,2})(?:st|nd|rd|th)\s+([A-Z][a-z]{2})\s+(\d{4})\s*$/);
-  if (!m) return null;
-  const [, day, mon, yr] = m;
-  const mm = MONTHS[mon];
-  if (!mm) return null;
-  return `${yr}-${String(mm).padStart(2,'0')}-${day.padStart(2,'0')}`;
-}
-function parseUltimateRugbyVenue(title) {
-  // extract venue between " at " and trailing date
-  const m = title.match(/\s+at\s+(.+?)\s+\d{1,2}(?:st|nd|rd|th)\s+[A-Z][a-z]{2}\s+\d{4}\s*$/);
-  return m ? m[1].trim() : '';
-}
-
-async function handleRugbyExternal() {
-  try {
-    const resp = await fetch(ULTIMATERUGBY_URL, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (monnas-wildeklawer)' },
-    });
-    if (!resp.ok) {
-      return new Response(JSON.stringify({ error: `ultimaterugby returned ${resp.status}`, matches: [] }), {
-        status: 502, headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    const html = await resp.text();
-
-    // Split on match-item divs and parse each one.
-    const items = html.split(/<div class="match-item"/).slice(1);
-    const matches = [];
-    const seenIds = new Set();
-    for (const chunk of items) {
-      // anchor link + title
-      const aMatch = chunk.match(/<a\s+href="(\/match\/[^"]+)"[^>]*>([^<]+)<\/a>/);
-      if (!aMatch) continue;
-      const href  = aMatch[1];
-      const title = aMatch[2].replace(/&amp;/g, '&').replace(/&#39;/g,"'").trim();
-
-      const date = parseUltimateRugbyDate(title);
-      const venue = parseUltimateRugbyVenue(title);
-      if (!date || !venue) continue;
-
-      // Filter to Wildeklawer venues only
-      const vlow = venue.toLowerCase();
-      if (!WK_RUGBY_VENUES.some(v => vlow.includes(v))) continue;
-
-      // Parse team-home and team-away display names
-      const homeBlock = chunk.match(/class="team-home"[\s\S]*?<span class="team-name">([^<]+)<\/span>/);
-      const awayBlock = chunk.match(/class="team-away"[\s\S]*?<span class="team-name">([^<]+)<\/span>/);
-      const team1 = (homeBlock ? homeBlock[1] : '').trim();
-      const team2 = (awayBlock ? awayBlock[1] : '').trim();
-      if (!team1 || !team2) continue;
-
-      // Status: kickoff time or played score
-      let kickoff = null, score1 = null, score2 = null, isPlayed = false;
-      // time span can wrap an <i> icon, so match against loose inner content
-      const timeMatch = chunk.match(/<span class="time">[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>/);
-      if (timeMatch) kickoff = timeMatch[1];
-      const scoreMatches = [...chunk.matchAll(/<span[^>]*class="[^"]*score[^"]*"[^>]*>\s*(\d+)\s*<\/span>/g)];
-      if (scoreMatches.length >= 2) {
-        score1 = Number(scoreMatches[0][1]);
-        score2 = Number(scoreMatches[1][1]);
-        isPlayed = true;
-      }
-
-      const idMatch = href.match(/\/(\d+)\s*$/);
-      const externalId = idMatch ? Number(idMatch[1]) : null;
-      if (externalId && seenIds.has(externalId)) continue; // dedupe: page lists each match in both Fixtures and Results panes
-      if (externalId) seenIds.add(externalId);
-      const matchDateTime = kickoff ? `${date}T${kickoff}:00+02:00` : `${date}T00:00:00+02:00`;
-
-      matches.push({
-        source: 'ultimaterugby',
-        id: externalId,
-        matchDateTime,
-        date,
-        kickoff: kickoff || null,
-        team1Name: team1,
-        team2Name: team2,
-        team1Id: null,
-        team2Id: null,
-        team1GoalsFor: score1,
-        team2GoalsFor: score2,
-        locationDisplay: venue,
-        age: inferAgeFromRugbyMatch(venue, team1, team2),
-        played: isPlayed,
-        externalUrl: 'https://www.ultimaterugby.com' + href,
-      });
-    }
-
-    return new Response(JSON.stringify({ matches, fetchedAt: new Date().toISOString() }), {
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' },
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: 'External fetch failed', matches: [] }), {
-      status: 502, headers: { 'Content-Type': 'application/json' },
-    });
-  }
-}
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === '/api/tournament')     return handleTournament(url);
-    if (url.pathname === '/api/streams')        return handleStreams(env);
-    if (url.pathname === '/api/rugby-external') return handleRugbyExternal();
+    if (url.pathname === '/api/tournament') return handleTournament(url);
+    if (url.pathname === '/api/streams')    return handleStreams(env);
     return env.ASSETS.fetch(request);
   },
 
