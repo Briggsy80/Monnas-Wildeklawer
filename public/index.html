@@ -693,13 +693,31 @@ function matchRow(m, isScrollAnchor) {
     </div>`;
 }
 
-/* Combine Sportivo matches with hockey fallback and/or external rugby
- * data. Sportivo always wins: a fallback/external match is dropped if
- * Sportivo has a match on the same date with matching team names.
- * Hockey positional fallbacks (e.g. "4th Group 1 vs 4th Group 2") will
- * never team-match Sportivo, so the whole-date override is used for
- * those (if Sportivo has any matches on day 2/3, drop fallback). */
+/* Manual kickoff corrections for individual Sportivo fixtures whose
+ * organisers entered the wrong time. Keyed by Sportivo match id;
+ * value is the corrected ISO datetime (UTC). Remove an entry once
+ * fixed upstream — these are workarounds, not permanent rules. */
+const KICKOFF_OVERRIDES = {
+  // 255983 — HS Monument Girls vs Northern Cape HS, Sat 25 Apr 2026.
+  // Sportivo says 09:30 SAST; published programme + Pixellot stream
+  // start (event 69e735df…a830, 08:23 SAST) confirm 08:30.
+  255983: '2026-04-25T06:30:00Z',
+};
+function applyKickoffOverrides(matches) {
+  for (const m of matches) {
+    const fix = KICKOFF_OVERRIDES[m.id];
+    if (fix) m.matchDateTime = fix;
+  }
+  return matches;
+}
+
+/* Combine Sportivo matches with the hockey positional fallback. Sportivo
+ * always wins: when Sportivo has any matches on a day, the fallback for
+ * that day is dropped (positional placeholders like "4th Group 1 vs
+ * 4th Group 2" can never team-match Sportivo, so per-match dedupe
+ * doesn't apply — whole-day takeover is the rule). */
 function mergeFixtures(sportivo) {
+  applyKickoffOverrides(sportivo);
   const merged = [...sportivo];
   const sportivoDates = new Set(sportivo.map(m => (m.matchDateTime || '').slice(0,10)));
 
