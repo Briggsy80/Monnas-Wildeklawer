@@ -698,20 +698,31 @@ function matchRow(m, isScrollAnchor) {
     </div>`;
 }
 
-/* Manual kickoff corrections for individual Sportivo fixtures whose
- * organisers entered the wrong time. Keyed by Sportivo match id;
- * value is the corrected ISO datetime (UTC). Remove an entry once
- * fixed upstream — these are workarounds, not permanent rules. */
-const KICKOFF_OVERRIDES = {
+/* Manual corrections for individual Sportivo fixtures whose organisers
+ * entered the wrong data. Keyed by Sportivo match id; value is an
+ * object with the field(s) to overwrite (matchDateTime, locationDisplay,
+ * etc.). Remove an entry once fixed upstream — these are workarounds,
+ * not permanent rules. */
+const MATCH_OVERRIDES = {
   // 255983 — HS Monument Girls vs Northern Cape HS, Sat 25 Apr 2026.
   // Sportivo says 09:30 SAST; published programme + Pixellot stream
   // start (event 69e735df…a830, 08:23 SAST) confirm 08:30.
-  255983: '2026-04-25T06:30:00Z',
+  255983: { matchDateTime: '2026-04-25T06:30:00Z' },
+  // Sun 26 Apr 2026 hockey-girls placement matches — Sportivo lists
+  // SPU but the published programme PDF keeps girls at KHS.
+  256067: { locationDisplay: 'KHS' },
+  256068: { locationDisplay: 'KHS' },
+  256069: { locationDisplay: 'KHS' },
+  256070: { locationDisplay: 'KHS' },
+  256071: { locationDisplay: 'KHS' },
+  256072: { locationDisplay: 'KHS' },
+  256073: { locationDisplay: 'KHS' },
+  256074: { locationDisplay: 'KHS' },
 };
-function applyKickoffOverrides(matches) {
+function applyMatchOverrides(matches) {
   for (const m of matches) {
-    const fix = KICKOFF_OVERRIDES[m.id];
-    if (fix) m.matchDateTime = fix;
+    const fix = MATCH_OVERRIDES[m.id];
+    if (fix) Object.assign(m, fix);
   }
   return matches;
 }
@@ -722,7 +733,7 @@ function applyKickoffOverrides(matches) {
  * 4th Group 2" can never team-match Sportivo, so per-match dedupe
  * doesn't apply — whole-day takeover is the rule). */
 function mergeFixtures(sportivo) {
-  applyKickoffOverrides(sportivo);
+  applyMatchOverrides(sportivo);
   const merged = [...sportivo];
   const sportivoDates = new Set(sportivo.map(m => (m.matchDateTime || '').slice(0,10)));
 
