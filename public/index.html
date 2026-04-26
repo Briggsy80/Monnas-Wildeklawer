@@ -668,7 +668,14 @@ function matchRow(m, isScrollAnchor) {
   const f1 = isFollowed(m.team1Id), f2 = isFollowed(m.team2Id);
   const isFollowedMatch = f1 || f2;
   const s1 = m.team1GoalsFor, s2 = m.team2GoalsFor;
-  const hasScore = typeof s1 === 'number' && typeof s2 === 'number';
+  const s1Has = typeof s1 === 'number', s2Has = typeof s2 === 'number';
+  // Sportivo can return one team's score before the other during a live
+  // match (the side that hasn't scored yet stays null until first goal).
+  // Treat any-score-present as "show the live score" with the missing
+  // side displayed as 0.
+  const hasScore = s1Has || s2Has;
+  const showS1 = s1Has ? s1 : (hasScore ? 0 : '');
+  const showS2 = s2Has ? s2 : (hasScore ? 0 : '');
   const stream = findStream(m.team1Name, m.team2Name, m.matchDateTime);
   const isProv = m.source === 'fallback';
   let provBadge = '';
@@ -694,7 +701,7 @@ function matchRow(m, isScrollAnchor) {
           ${streamBtn(stream)}
         </div>
       </div>
-      <div class="fix-score ${hasScore?'':'no-score'}">${hasScore?`${s1} – ${s2}`:'–'}</div>
+      <div class="fix-score ${hasScore?'':'no-score'}">${hasScore?`${showS1} – ${showS2}`:'–'}</div>
     </div>`;
 }
 
