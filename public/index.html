@@ -1005,6 +1005,17 @@ loadTournament();
 loadStreams();
 setInterval(loadTournament, 60_000);
 setInterval(loadStreams, 300_000);
+
+/* Browsers throttle setInterval in backgrounded tabs (down to 1/min, often
+ * pausing entirely after a few minutes hidden). Re-poll the moment the
+ * tab regains focus so users returning from another tab don't sit on
+ * stale data waiting for the next interval tick. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    loadTournament();
+    loadStreams();
+  }
+});
 </script>
 </body>
 </html>
