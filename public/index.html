@@ -734,21 +734,25 @@ function applyMatchOverrides(matches) {
   return matches;
 }
 
-/* Combine Sportivo matches with the hockey positional fallback. Sportivo
- * always wins: when Sportivo has any matches on a day, the fallback for
- * that day is dropped (positional placeholders like "4th Group 1 vs
- * 4th Group 2" can never team-match Sportivo, so per-match dedupe
- * doesn't apply — whole-day takeover is the rule). */
+/* Combine Sportivo matches with the hockey positional fallback.
+ * Per-slot dedupe (by datetime): a fallback row drops out only when
+ * Sportivo has a match at the same kickoff. Lets a partially-published
+ * day (e.g. Sportivo posts only Mon 27 matches 33-34 while 35-40 still
+ * depend on Sun results) show the real fixtures alongside the
+ * remaining placeholders, instead of hiding all 8 the moment the first
+ * one publishes. */
 function mergeFixtures(sportivo) {
   applyMatchOverrides(sportivo);
   const merged = [...sportivo];
-  const sportivoDates = new Set(sportivo.map(m => (m.matchDateTime || '').slice(0,10)));
+  const sportivoTimes = new Set(
+    sportivo.map(m => new Date(m.matchDateTime || '').getTime())
+            .filter(Number.isFinite)
+  );
 
-  // Hockey fallback (only for hockey-girls / hockey-boys keys)
   if (HOCKEY_FALLBACK[currentKey]) {
     for (const fb of hockeyFallbackToMatches(currentKey)) {
-      const day = fb.matchDateTime.slice(0,10);
-      if (sportivoDates.has(day)) continue; // Sportivo has taken over this day
+      const fbTime = new Date(fb.matchDateTime).getTime();
+      if (sportivoTimes.has(fbTime)) continue; // Sportivo has this slot
       merged.push(fb);
     }
   }
