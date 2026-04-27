@@ -356,19 +356,11 @@ const HOCKEY_FALLBACK = {
     { n:39, d:'2026-04-27', t:'15:30', label:'Position 3 & 4',    t1:'Loser M31',   t2:'Loser M32' },
     { n:40, d:'2026-04-27', t:'16:50', label:'Final — Position 1 & 2', t1:'Winner M31', t2:'Winner M32' },
   ]},
-  'hockey-boys': { venue: 'SPU', matches: [
-    // Day 2 — Sun 26 Apr 2026 — Sportivo's extraPhases is fully
-    // populated for boys, so we lean on it as the sole source. Day 3
-    // (Mon 27) placement placeholders kept below.
-    { n:33, d:'2026-04-27', t:'07:30', label:'Position 15 & 16',  t1:'Loser M25',   t2:'Loser M26' },
-    { n:34, d:'2026-04-27', t:'08:50', label:'Position 13 & 14',  t1:'Winner M25',  t2:'Winner M26' },
-    { n:35, d:'2026-04-27', t:'10:10', label:'Position 11 & 12',  t1:'Loser M27',   t2:'Loser M28' },
-    { n:36, d:'2026-04-27', t:'11:30', label:'Position 9 & 10',   t1:'Winner M27',  t2:'Winner M28' },
-    { n:37, d:'2026-04-27', t:'12:50', label:'Position 7 & 8',    t1:'Loser M29',   t2:'Loser M30' },
-    { n:38, d:'2026-04-27', t:'14:10', label:'Position 5 & 6',    t1:'Winner M29',  t2:'Winner M30' },
-    { n:39, d:'2026-04-27', t:'15:30', label:'Position 3 & 4',    t1:'Loser M31',   t2:'Loser M32' },
-    { n:40, d:'2026-04-27', t:'16:50', label:'Final — Position 1 & 2', t1:'Winner M31', t2:'Winner M32' },
-  ]},
+  // hockey-boys has no fallback — Sportivo's extraPhases is fully
+  // populated for both Sun 26 and Mon 27, with kickoff times that
+  // differ from the PDF-derived fallback (70-min vs 80-min spacing).
+  // Per-slot dedupe couldn't hide the mismatch, so we lean on Sportivo
+  // as the sole source. Re-add an entry here if Sportivo ever regresses.
 };
 function hockeyFallbackToMatches(key) {
   const entry = HOCKEY_FALLBACK[key];
