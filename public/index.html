@@ -357,17 +357,9 @@ const HOCKEY_FALLBACK = {
     { n:40, d:'2026-04-27', t:'16:50', label:'Final — Position 1 & 2', t1:'Winner M31', t2:'Winner M32' },
   ]},
   'hockey-boys': { venue: 'SPU', matches: [
-    // Day 2 — Sun 26 Apr 2026 — playoff semis (teams derived from
-    // Sportivo Sat 25 pool standings; Sportivo's tiebreaker order).
-    // Match numbers (n=25–32) follow the official Wildeklawer programme.
-    { n:25, d:'2026-04-26', t:'07:30', label:'Bottom 4 Playoff',  t1:'Kimberley Boys High 1st Team',           t1Id:304981, t2:'HS Diamantveld 1st Team',                t2Id:6606   },
-    { n:26, d:'2026-04-26', t:'08:50', label:'Bottom 4 Playoff',  t1:'Uppies Boys 1st Team',                   t1Id:13286,  t2:"St. Patrick's CBC 1st Team",             t2Id:304979 },
-    { n:27, d:'2026-04-26', t:'10:10', label:'Shield Semi Final', t1:'RHS 1ste Seuns',                         t1Id:7497,   t2:'Northern Cape HS 1st Team',              t2Id:304982 },
-    { n:28, d:'2026-04-26', t:'11:30', label:'Shield Semi Final', t1:'HS Sentraal 1st Team',                   t1Id:2324,   t2:'Graeme College 1st Team',                t2Id:309381 },
-    { n:29, d:'2026-04-26', t:'12:50', label:'Plate Semi Final',  t1:'Duineveld HS 1st Team',                  t1Id:309353, t2:'Nories Boys',                            t2Id:10453  },
-    { n:30, d:'2026-04-26', t:'14:10', label:'Plate Semi Final',  t1:'Durbanville HS 1st Team',                t1Id:230,    t2:'Stellenberg HS U19 1st Team',            t2Id:178    },
-    { n:31, d:'2026-04-26', t:'15:30', label:'Cup Semi Final',    t1:'HS Monument 1st Team Boys',              t1Id:100,    t2:'HS Waterkloof 1st Team',                 t2Id:10451  },
-    { n:32, d:'2026-04-26', t:'16:50', label:'Cup Semi Final',    t1:'HS Outeniqua 1st Team',                  t1Id:89,     t2:'Helpmekaar Kollege Male U19 1st Team',   t2Id:98     },
+    // Day 2 — Sun 26 Apr 2026 — Sportivo's extraPhases is fully
+    // populated for boys, so we lean on it as the sole source. Day 3
+    // (Mon 27) placement placeholders kept below.
     { n:33, d:'2026-04-27', t:'07:30', label:'Position 15 & 16',  t1:'Loser M25',   t2:'Loser M26' },
     { n:34, d:'2026-04-27', t:'08:50', label:'Position 13 & 14',  t1:'Winner M25',  t2:'Winner M26' },
     { n:35, d:'2026-04-27', t:'10:10', label:'Position 11 & 12',  t1:'Loser M27',   t2:'Loser M28' },
